@@ -198,6 +198,7 @@ javascript:
     try { var s = JSON.parse(localStorage.getItem(SPEEDS_KEY)); return (s && s.speeds) || null; } catch (e) { return null; }
   }
   var effSpeeds = loadSpeeds();
+  var hintRefresh = null; /* set by openPanel; re-renders the slowest-unit hint */
   function fetchSpeeds(done) {
     var x = new XMLHttpRequest();
     x.open('GET', '/interface.php?func=get_unit_info');
@@ -206,6 +207,7 @@ javascript:
       if (sp) {
         effSpeeds = sp;
         try { localStorage.setItem(SPEEDS_KEY, JSON.stringify({ fetchedAt: Date.now(), speeds: sp })); } catch (e) { }
+        try { if (hintRefresh) hintRefresh(); } catch (e) { }
         if (done) done();
       }
     };
@@ -348,6 +350,7 @@ javascript:
       var us = readUnits(), s = core.slowestUnit(us, effSpeeds);
       speedInfo.textContent = s ? T.slowestInfo(s, core.slowestMinPerField(us, game_data.speed, game_data.unit_speed, effSpeeds)) : T.errNoUnits;
     }
+    hintRefresh = refreshSpeed;
     worldUnits().forEach(function (u) {
       var cell = document.createElement('label');
       cell.style.cssText = 'display:flex;align-items:center;gap:2px;';
