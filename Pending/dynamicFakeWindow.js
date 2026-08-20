@@ -1,8 +1,8 @@
 javascript:
 /* 
- * fakeWindowPlanner v1.0 — GUI fake planner for the Rally Point
+ * dynamicFakeWindow v1.0 — GUI fake planner for the Rally Point
  *
- *             Script: fakeWindowPlanner
+ *             Script: dynamicFakeWindow
  *             Created by: Vanquished
  *             Version: 1.0 (dd82d790d04e2e181b6f4907119ae2b3ed498083)
  *             License: GNU GENERAL PUBLIC LICENSE VERSION 3 https://www.gnu.org/licenses/gpl-3.0.en.html
