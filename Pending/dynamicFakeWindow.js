@@ -35,11 +35,31 @@ javascript:
       return out;
     },
 
-    /* Minutes per field of the slowest unit with a count > 0. */
-    slowestMinPerField: function (units, worldSpeed, unitSpeed) {
+    /* Effective minutes per field of the slowest unit with a count > 0.
+     * effSpeeds (per-world effective speeds from get_unit_info) wins when known;
+     * otherwise BASE_SPEED scaled by the world multipliers. */
+    slowestMinPerField: function (units, worldSpeed, unitSpeed, effSpeeds) {
+      var mult = (Number(worldSpeed) || 1) * (Number(unitSpeed) || 1);
       var slow = 0;
-      for (var u in units) if (units[u] > 0 && BASE_SPEED[u] > slow) slow = BASE_SPEED[u];
-      return slow / ((Number(worldSpeed) || 1) * (Number(unitSpeed) || 1));
+      for (var u in units) {
+        if (!(units[u] > 0)) continue;
+        var m = (effSpeeds && effSpeeds[u] > 0) ? effSpeeds[u] : BASE_SPEED[u] / mult;
+        if (m > slow) slow = m;
+      }
+      return slow;
+    },
+
+    /* Parse /interface.php?func=get_unit_info XML. The <speed> values are
+     * EFFECTIVE minutes per field (already divided by world speed x unit
+     * modifier — verified on worlds where the net multiplier is not 1).
+     * Returns {unit: minPerField} or null if the text is not that XML. */
+    parseUnitInfoXml: function (text) {
+      var out = {}, found = 0;
+      for (var u in BASE_SPEED) {
+        var m = String(text || '').match(new RegExp('<' + u + '>[\\s\\S]*?<speed>([\\d.]+)'));
+        if (m && Number(m[1]) > 0) { out[u] = Number(m[1]); found++; }
+      }
+      return (out.spy && out.ram) ? out : null;
     },
 
     /* Keep only known units with a positive whole count. */
@@ -54,9 +74,10 @@ javascript:
     },
 
     /* Name of the slowest unit with a count > 0, or null. */
-    slowestUnit: function (units) {
+    slowestUnit: function (units, effSpeeds) {
+      function mins(u) { return (effSpeeds && effSpeeds[u] > 0) ? effSpeeds[u] : BASE_SPEED[u]; }
       var slow = null;
-      for (var u in units) if (units[u] > 0 && (slow === null || BASE_SPEED[u] > BASE_SPEED[slow])) slow = u;
+      for (var u in units) if (units[u] > 0 && (slow === null || mins(u) > mins(slow))) slow = u;
       return slow;
     },
 
@@ -75,10 +96,10 @@ javascript:
     },
 
     /* Classify every target by arrival time (sent at nowMs from origin). */
-    plan: function (cfg, origin, nowMs, worldSpeed, unitSpeed) {
+    plan: function (cfg, origin, nowMs, worldSpeed, unitSpeed, effSpeeds) {
       var units = core.normalizeUnits(cfg.units);
       if (!Object.keys(units).length) units = UNITS;
-      var mpf = core.slowestMinPerField(units, worldSpeed, unitSpeed);
+      var mpf = core.slowestMinPerField(units, worldSpeed, unitSpeed, effSpeeds);
       var start = core.partsToTime(cfg.startDate, cfg.startTime);
       var end = core.partsToTime(cfg.endDate, cfg.endTime);
       var all = core.parseCoords(cfg.coords);
@@ -168,6 +189,28 @@ javascript:
   }
 
   var LS_KEY = 'fakePlanner:' + game_data.world;
+
+  /* Effective unit speeds (min/field) from get_unit_info, cached per world.
+   * game_data does NOT expose speed/unit_speed, so this XML is the only
+   * reliable source — and its values need no further scaling. */
+  var SPEEDS_KEY = 'fakePlanner:speeds:' + game_data.world;
+  function loadSpeeds() {
+    try { var s = JSON.parse(localStorage.getItem(SPEEDS_KEY)); return (s && s.speeds) || null; } catch (e) { return null; }
+  }
+  var effSpeeds = loadSpeeds();
+  function fetchSpeeds(done) {
+    var x = new XMLHttpRequest();
+    x.open('GET', '/interface.php?func=get_unit_info');
+    x.onload = function () {
+      var sp = core.parseUnitInfoXml(x.responseText);
+      if (sp) {
+        effSpeeds = sp;
+        try { localStorage.setItem(SPEEDS_KEY, JSON.stringify({ fetchedAt: Date.now(), speeds: sp })); } catch (e) { }
+        if (done) done();
+      }
+    };
+    x.send();
+  }
 
   function loadCfg() {
     try { return JSON.parse(localStorage.getItem(LS_KEY)) || null; } catch (e) { return null; }
@@ -302,8 +345,8 @@ javascript:
       return core.normalizeUnits(o);
     }
     function refreshSpeed() {
-      var us = readUnits(), s = core.slowestUnit(us);
-      speedInfo.textContent = s ? T.slowestInfo(s, core.slowestMinPerField(us, game_data.speed, game_data.unit_speed)) : T.errNoUnits;
+      var us = readUnits(), s = core.slowestUnit(us, effSpeeds);
+      speedInfo.textContent = s ? T.slowestInfo(s, core.slowestMinPerField(us, game_data.speed, game_data.unit_speed, effSpeeds)) : T.errNoUnits;
     }
     worldUnits().forEach(function (u) {
       var cell = document.createElement('label');
@@ -377,7 +420,7 @@ javascript:
 
   /* ---------------- fill ---------------- */
   function runFill(cfg) {
-    var res = core.plan(cfg, game_data.village.coord, serverNow(), game_data.speed, game_data.unit_speed);
+    var res = core.plan(cfg, game_data.village.coord, serverNow(), game_data.speed, game_data.unit_speed, effSpeeds);
     var choice = core.pick(res.eligible);
     if (!choice) {
       var msg = T.noneInWindow(res.all.length, res.early.length, res.late.length);
@@ -419,4 +462,10 @@ javascript:
   var saved = loadCfg();
   if (cfgValid(saved)) runFill(saved);
   else openPanel(saved || {});
+  /* First ever run on this world: fetch the real speeds, then redo the fill
+   * (the provisional fill used BASE_SPEED, which assumes a net multiplier of 1). */
+  if (!effSpeeds) fetchSpeeds(function () {
+    var c = loadCfg();
+    if (cfgValid(c)) runFill(c);
+  });
 })();
