@@ -58,7 +58,15 @@ These scripts have been **submitted for review but are not officially approved y
 
 *Submitted for review: 2026-08-20*
 
-Fake planner for the Rally Point: paste a target list and an arrival time window, and each run picks a random target whose attack (sent now, at your fake template's slowest-unit speed) lands inside the window, then fills the target and units for you. Configurable units, English/Spanish UI, settings saved per world.
+Fake planner for the Rally Point: paste a target list and an arrival time window, and each run picks a target whose attack (sent now, at your fake template's slowest-unit speed) lands inside the window, then fills the target and units for you. Configurable units, English/Spanish UI, settings saved per world.
+
+**v1.1** adds a *Target order* setting in the panel: **Random** (as before), **Random (no repeats)** and **List order**. A target counts as used when you click *Attack*; once every eligible target has been used the cycle starts over, and editing the list (or the *Reset* button) clears the progress.
+
+```
+javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/dynamicFakeWindowv1-1.js")
+```
+
+v1.0 (the version submitted for review — random target only):
 
 ```
 javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/dynamicFakeWindow.js")
