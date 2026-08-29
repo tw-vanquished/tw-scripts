@@ -3,7 +3,19 @@ Disclaimer
 By uploading a user-generated mod for use with Tribal Wars, the creator grants InnoGames a perpetual, irrevocable, worldwide, royalty-free, non-exclusive license to use, reproduce, distribute, publicly display, modify, and create derivative works of the mod. This license permits InnoGames to incorporate the mod into any aspect of the game and its related services, including promotional and commercial endeavors, without any requirement for compensation or attribution to the uploader. The uploader represents and warrants that they have the legal right to grant this license and that the mod does not infringe upon any third-party rights. German law applies.
 */
 
-// NeilBReportsToClipboard
+// NeilBReportsToClipboard — batch battle-report exporter (reports overview -> JSON)
+//
+// Original script created by NeilB (Tribal Wars .net). This copy was hotfixed by
+// Vanquished so it also works on the Spanish servers (guerrastribales.es); the
+// exporter's behaviour and output format are NeilB's. Changes, all parsing-side:
+//   - world id read from the first hostname label on any TW domain (not only .net)
+//   - ES date format (DD.MM.YY HH:MM:SS) accepted next to the EN one
+//   - localized labels: Hora de batalla / Enviado, Cantidad / Pérdidas rows found
+//     by position instead of by English text; matches anchored to the exact cell
+//     so the outer layout rows (whole report as one blob) can't match by accident
+//   - any continent letter in village names (K64 on .net, C64 on .es)
+//   - luck sign taken from the clover icon (klee / klee_grau) rather than its alt text
+// Hotfix 2026-08-02.
 (function () {
 
   /* ── Constants ── */
