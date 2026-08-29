@@ -15,7 +15,7 @@ By uploading a user-generated mod for use with Tribal Wars, the creator grants I
 //     so the outer layout rows (whole report as one blob) can't match by accident
 //   - any continent letter in village names (K64 on .net, C64 on .es)
 //   - luck sign taken from the clover icon (klee / klee_grau) rather than its alt text
-// Hotfix 2026-08-02.
+// Hotfix 2026-08-02. Approved by the Tribal Wars .es support team (ticket #20659456).
 (function () {
 
   /* ── Constants ── */

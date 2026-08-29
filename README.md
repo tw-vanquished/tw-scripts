@@ -26,6 +26,14 @@ Mass village renamer. Build names from ordered segments (fixed text, auto-increm
 javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Approved/renameVillages.js")
 ```
 
+### reportsExport
+
+Batch battle-report exporter: on the Reports overview, select attack/defence reports and export them as a `tw-reports-*.json` file. This is **NeilB's** *ReportsToClipboard*, hotfixed by Vanquished so it works on the Spanish servers (world id from any TW domain, ES date format, localized table labels). Approved by the Tribal Wars .es support team — ticket **#20659456**.
+
+```
+javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Approved/reportsExport.js")
+```
+
 ### supportSender
 
 Mass support sender (custom version of Costache Madalin's Support Sender): send support to a list of targets, including full support-plan imports.
@@ -50,24 +58,34 @@ Paste a list of village coordinates and export every support stationed in those 
 javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Approved/villageSupports.js")
 ```
 
+### dynamicFakeWindow (v1.0)
+
+Fake planner for the Rally Point: paste a target list and an arrival time window, and each run picks a target whose attack (sent now, at your fake template's slowest-unit speed) lands inside the window, then fills the target and units for you. Configurable units, English/Spanish UI, settings saved per world.
+
+v1.0 is approved by the Tribal Wars .es support team — ticket **#20684174**. The file keeps its original path so quickbar links installed during the review keep working:
+
+```
+javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/dynamicFakeWindow.js")
+```
+
 ## Pending Scripts
 
 These scripts have been **submitted for review but are not officially approved yet**. You can already load them with the snippets below — **at your own risk** — until they are approved and reach the Script Library.
 
-### dynamicFakeWindow
+### dynamicFakeWindow v1.1
 
-*Submitted for review: 2026-08-20*
+*Not yet reviewed (v1.0 above is the approved version).*
 
-Fake planner for the Rally Point: paste a target list and an arrival time window, and each run picks a target whose attack (sent now, at your fake template's slowest-unit speed) lands inside the window, then fills the target and units for you. Configurable units, English/Spanish UI, settings saved per world.
-
-**v1.1** adds a *Target order* setting in the panel: **Random** (as before), **Random (no repeats)** and **List order**. A target counts as used when you click *Attack*; once every eligible target has been used the cycle starts over, and editing the list (or the *Reset* button) clears the progress.
+Same planner as the approved v1.0; **v1.1** adds a *Target order* setting in the panel: **Random** (as before), **Random (no repeats)** and **List order**. A target counts as used when you click *Attack*; once every eligible target has been used the cycle starts over, and editing the list (or the *Reset* button) clears the progress.
 
 ```
 javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/dynamicFakeWindowv1-1.js")
 ```
 
-v1.0 (the version submitted for review — random target only):
+### incomingOrders v2.0
+
+*Not yet submitted for review.* Same exporter as the approved incomingOrders, but the per-command details (origin, exact arrival, units) are read from the game's lightweight hover-preview data instead of each command's full info page, and requests run asynchronously so the tab never freezes. Same CSV/JSON output, plus `arrival_epoch_ms` in the JSON.
 
 ```
-javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/dynamicFakeWindow.js")
+javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/incomingOrdersv2.js")
 ```
