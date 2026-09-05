@@ -97,3 +97,11 @@ javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@mai
 ```
 javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/outgoingCommands.js")
 ```
+
+### loginLocations
+
+*Not yet submitted for review.* Run it on Settings → Logins (`screen=settings&mode=logins`) to see **where** your last 20 logins came from: the script looks up every unique IP (IPv4 and IPv6) once through the free ipwho.is geolocation service (ipinfo.io as fallback) and adds a *Location (approx.)* column next to the IP with city, region, country and ISP — hover a cell for the ASN, coordinates and source. Results are cached in the browser for a week, so re-running only looks up new addresses. If the logins come from more than one place, the minority rows are marked in red so an unfamiliar login stands out. Works on any language server (the IP column is detected by its content). Geo-IP data is approximate by nature.
+
+```
+javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/loginLocations.js")
+```
