@@ -72,14 +72,14 @@ javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@mai
 
 These scripts have been **submitted for review but are not officially approved yet**. You can already load them with the snippets below — **at your own risk** — until they are approved and reach the Script Library.
 
-### dynamicFakeWindow v1.1
+### dynamicFakeWindow v1.2
 
-*Not yet reviewed (v1.0 above is the approved version).*
+*Submitted for review (v1.0 above is the approved version). v1.1 was returned with one request — drop the automatic focus on the *Attack* button after filling — and v1.2 is v1.1 with exactly that change.*
 
-Same planner as the approved v1.0; **v1.1** adds a *Target order* setting in the panel: **Random** (as before), **Random (no repeats)** and **List order**. A target counts as used when you click *Attack*; once every eligible target has been used the cycle starts over, and editing the list (or the *Reset* button) clears the progress.
+Same planner as the approved v1.0; **v1.2** adds a *Target order* setting in the panel: **Random** (as before), **Random (no repeats)** and **List order**. A target counts as used when you click *Attack*; once every eligible target has been used the cycle starts over, and editing the list (or the *Reset* button) clears the progress.
 
 ```
-javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/dynamicFakeWindowv1-1.js")
+javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/dynamicFakeWindowv1-2.js")
 ```
 
 ### incomingOrders v2.0
