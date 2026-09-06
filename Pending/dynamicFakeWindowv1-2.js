@@ -564,6 +564,10 @@ javascript:
     var target = document.getElementsByName('input')[0];
     if (!target) { setStatus(T.noTargetField, 'red'); return; }
     target.value = choice.c;
+    /* Same as the approved "fake script by Sophie": fire a jQuery submit event on the
+     * target field. It only bubbles to the game's own handlers (no native submit, no
+     * command sent); the game then treats the target as confirmed. */
+    if (typeof jQuery === 'function') { try { jQuery(target).trigger('submit'); } catch (e) { } }
     /* clear every unit field first so a template change never leaves stale counts */
     Object.keys(BASE_SPEED).forEach(function (uc) {
       var f = document.getElementsByName(uc)[0];
