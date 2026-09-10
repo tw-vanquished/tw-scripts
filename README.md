@@ -90,6 +90,14 @@ javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@mai
 javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/incomingOrdersv2.js")
 ```
 
+### incomingOrders v2.1
+
+*Not yet submitted for review.* Same as v2.0, plus the **catapult target**: for every command that carries catapults the export now includes the building they aim at (`catapult_target` = the game's building key, `catapult_target_name` = its name in your game language; both empty for commands without catapults). The CSV gains a last `CatapultTarget` column. Everything else is unchanged.
+
+```
+javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/incomingOrdersv2-1.js")
+```
+
 ### outgoingCommands
 
 *Not yet submitted for review.* Run it on the tribe troop overview (Tribe → Members → Troops) to get a compact list of every member's active outgoing commands: player and command count, sortable by either column, with a link to the player's profile and a mail icon that opens a new message to them. Reads the page only, nothing is fetched. The dialog can be resized from its bottom-right corner; the size is remembered.
