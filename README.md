@@ -113,3 +113,11 @@ javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@mai
 ```
 javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/loginLocations.js")
 ```
+
+### apoyosEntrantes
+
+*Not yet submitted for review.* Run it on any village's info page (`screen=info_village&id=…`) to summarise the **incoming support** heading there. For every support command listed on the page the script reads the game's lightweight hover-preview data for the travelling units, writes them next to each command in the table, and prepends a summary table: one row per **sending player** with their order count, units and farm population, plus a total row — and the same table ready to paste into the tribe forum as BB-code. Works on your own villages and on a tribe-mate's, commands disappear from the table as they land, and the units of each command are cached in the browser, so re-running only fetches the commands it has not seen before. The interface is in Spanish. This is a rework of **plainte**'s incoming-supports script, with earlier changes by **oreg** and **numlock**.
+
+```
+javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/apoyosEntrantes.js")
+```
