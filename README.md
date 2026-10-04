@@ -98,6 +98,14 @@ javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@mai
 javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/incomingOrdersv2-1.js")
 ```
 
+### incomingOrders v2.2
+
+*Not yet submitted for review.* Same as v2.1, plus **returning filters**: the single *Export returning* switch is replaced by a row of boxes mirroring the attack filters — large / medium / small returning attacks, returning with a noble, and **returning with scouts** (the command came back with spies, so a report with the target's troops exists) — plus an *All returning* box that also covers cancelled orders and support heading back. Your previous *returning* setting is carried over on the first run. Export format unchanged.
+
+```
+javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/incomingOrdersv2-2.js")
+```
+
 ### outgoingCommands
 
 *Not yet submitted for review.* Run it on the tribe troop overview (Tribe → Members → Troops) to get a compact list of every member's active outgoing commands: player and command count, sortable by either column, with a link to the player's profile and a mail icon that opens a new message to them. Reads the page only, nothing is fetched. The dialog can be resized from its bottom-right corner; the size is remembered.
