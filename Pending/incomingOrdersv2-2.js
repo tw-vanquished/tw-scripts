@@ -75,6 +75,28 @@ function ioOpenUI() {
         '<p><input type="button" class="btn evt-confirm-btn btn-confirm-yes" onclick="ioReadData()" value="Read commands"></input></p>' +
         '</body>';
     Dialog.show("Incoming orders", html);
+    ioWidenDialog(IO_DIALOG_WIDTH);
+}
+
+// The game fits its dialog to ~360px, which wraps the end of the returning
+// filter row onto a second line. Widen the OUTER #popup_box (the bordered box
+// the game sizes; its .popup_box_content then fills it) — same approach as
+// outgoingCommands' resizable dialog. Capped to the viewport; the dialog may
+// still be mounting on slow pages, so retry briefly.
+var IO_DIALOG_WIDTH = 480;
+
+function ioWidenDialog(width, tries) {
+    var box = document.getElementById("popup_box_Incoming orders");
+    var content = box ? box.querySelector(".popup_box_content") : null;
+    if (!box || !content) {
+        if ((tries || 0) < 20) setTimeout(function () { ioWidenDialog(width, (tries || 0) + 1); }, 50);
+        return;
+    }
+    var w = Math.round(Math.min(width, window.innerWidth * 0.95));
+    box.style.boxSizing = "content-box";
+    box.style.width = w + "px";
+    content.style.boxSizing = "border-box";
+    content.style.width = "100%";
 }
 
 // Game icon for the filter labels; image_base is a global the game defines on
