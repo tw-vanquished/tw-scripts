@@ -1,5 +1,5 @@
 // Anvil Recipes (Yunque del Rey Mercenario) by Vanquished
-// Version 1.3, 2026-10-08
+// Version 1.4, 2026-10-08
 //
 // The crafting event's recipe book, including the recipes you have NOT
 // discovered yet, with an "Elaborar" button on every row. Run it from the
@@ -20,12 +20,14 @@
 //
 // How it works: the recipe book page embeds all 84 recipes (id + result item)
 // in its CraftingEvent.init() call, but only the discovered ones carry a
-// materials list. Recipe ids are consecutive and ordered by the number of rare
+// materials list. Sorted by id, the recipes are ordered by the number of rare
 // metals in the combination (0, 1, 2, 3) and lexicographically inside each
-// group, so the id alone tells which three metals a recipe needs. Which item a
+// group, so a recipe's rank among the ids tells which three metals it needs. Which item a
 // recipe gives differs per player, so the list is yours only. Material names
 // and rarities come from the page, so it works on any world and language.
 //
+// v1.4 (2026-10-08): look recipes up by their rank among the ids instead of
+//      id - lowest id (some accounts have gaps in their recipe ids).
 // v1.3 (2026-10-08): the game's styled tooltips on the metal and item icons
 //      (class tooltip + UI.ToolTip, as the book does).
 // v1.2 (2026-10-08): opens directly on all recipes, "Solo sin descubrir"
@@ -80,7 +82,7 @@
     }
 
     // All 3-metal combinations in recipe-id order: by number of rare metals,
-    // then lexicographic. combos[recipe_id - lowest id] = [a, b, c].
+    // then lexicographic. combos[rank of recipe_id among all ids] = [a, b, c].
     function arCombos(mats) {
         var combos = [];
         for (var a = 1; a <= 7; a++) for (var b = a; b <= 7; b++) for (var c = b; c <= 7; c++) combos.push([a, b, c]);
@@ -137,10 +139,11 @@
 
     function arShow(data) {
         var mats = data.mats, inventory = data.inventory, combos = arCombos(mats);
-        var minId = Math.min.apply(null, data.recipes.map(function (r) { return r.recipe_id; }));
+        var ids = data.recipes.map(function (r) { return r.recipe_id; }).sort(function (a, b) { return a - b; });
+        var rank = {}; ids.forEach(function (id, i) { rank[id] = i; });
         // Book order (the array order the page ships), each with its combo.
         var all = data.recipes.map(function (r) {
-            return { r: r, combo: combos[r.recipe_id - minId], known: !!r.materials };
+            return { r: r, combo: combos[rank[r.recipe_id]], known: !!r.materials };
         });
         var onlyUnknown = false, page = 0, rows = all, pages = 1;
 
