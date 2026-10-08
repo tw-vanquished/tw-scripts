@@ -1,5 +1,5 @@
 // Anvil Recipes (Yunque del Rey Mercenario) by Vanquished
-// Version 1.2, 2026-10-08
+// Version 1.3, 2026-10-08
 //
 // The crafting event's recipe book, including the recipes you have NOT
 // discovered yet, with an "Elaborar" button on every row. Run it from the
@@ -26,6 +26,8 @@
 // recipe gives differs per player, so the list is yours only. Material names
 // and rarities come from the page, so it works on any world and language.
 //
+// v1.3 (2026-10-08): the game's styled tooltips on the metal and item icons
+//      (class tooltip + UI.ToolTip, as the book does).
 // v1.2 (2026-10-08): opens directly on all recipes, "Solo sin descubrir"
 //      filter box, stock in the header, Elaborar button per row (craft
 //      verified in-game on es103: an undiscovered recipe was crafted and
@@ -101,7 +103,7 @@
     function arMatIcon(id, mats) {
         var label = mats[id] ? mats[id].label : id;
         return ICON_BASE
-            ? '<img src="' + ICON_BASE + id + '.webp" title="' + arEsc(label) + '" alt="' + arEsc(label) + '" style="width:24px;height:24px;vertical-align:middle">'
+            ? '<img class="tooltip" src="' + ICON_BASE + id + '.webp" title="' + arEsc(label) + '" alt="' + arEsc(label) + '" style="width:24px;height:24px;vertical-align:middle">'
             : arEsc(label);
     }
     function arDescHtml(item) {
@@ -126,7 +128,7 @@
         var mark = x.known ? "" : ' <span title="Sin descubrir" style="color:#b00;font-weight:bold">?</span>';
         return "<tr" + (x.known ? "" : ' style="background:#fff3c4"') + ">" + tds +
             '<td style="text-align:center">=</td>' +
-            '<td><img src="' + arEsc(x.r.item.image) + '" alt="" style="width:24px;height:24px;vertical-align:middle"></td>' +
+            '<td><img class="tooltip" src="' + arEsc(x.r.item.image) + '" alt="" title="' + arEsc("<p>" + x.r.item.name + "</p>" + (x.r.item.descriptions || []).map(function (d) { return "<p>" + d.text + "</p>"; }).join("")) + '" style="width:24px;height:24px;vertical-align:middle"></td>' +
             '<td style="white-space:nowrap"><b>' + arEsc(x.r.item.name) + "</b>" + mark + "</td>" +
             '<td style="font-size:11px;min-width:340px">' + arDescHtml(x.r.item) + "</td>" +
             '<td><a href="#" class="btn ar-craft' + (can ? "" : " btn-disabled") + '" data-idx="' + idx + '"' +
@@ -187,6 +189,8 @@
             $("#ar-page").text("Página " + (page + 1) + " / " + pages);
             $("#ar-prev").toggleClass("btn-disabled", page === 0);
             $("#ar-next").toggleClass("btn-disabled", page >= pages - 1);
+            // The game's styled tooltip (what the book shows on hover) instead of the browser's title bubble.
+            if (typeof UI != "undefined" && UI.ToolTip) UI.ToolTip($("#popup_box_anvil_recipes .tooltip"));
         }
 
         // The same request the anvil's form sends (ajaxaction=craft with three
