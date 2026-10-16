@@ -82,6 +82,16 @@ Same planner as the approved v1.0; **v1.2** adds a *Target order* setting in the
 javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/dynamicFakeWindowv1-2.js")
 ```
 
+### supportSender v1.1
+
+*Submitted for review (the supportSender above is the approved v1.0).*
+
+Same support sender, plus a **k / units** switch above the troop table: type amounts in thousands (as before, still the default) or as plain numbers (500 instead of 0.5). Switching converts what is already typed, and the choice is remembered per world. Fixes: with *packets land between* on, villages whose rams also land in the window no longer get a ram added (it slowed the whole packet to ram speed); per-village shares below one unit are no longer lost; *Fill inputs* also clears unit boxes in columns hidden by the unit filter; totals in k show three decimals, so sending the full shown amount is no longer refused.
+
+```
+javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/supportSenderv1-1.js")
+```
+
 ### incomingOrders v2.0
 
 *Not yet submitted for review.* Same exporter as the approved incomingOrders, but the per-command details (origin, exact arrival, units) are read from the game's lightweight hover-preview data instead of each command's full info page, and requests run asynchronously so the tab never freezes. Same CSV/JSON output, plus `arrival_epoch_ms` in the JSON.
