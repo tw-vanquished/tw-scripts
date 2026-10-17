@@ -92,6 +92,16 @@ Same support sender, plus a **k / units** switch above the troop table: type amo
 javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/supportSenderv1-1.js")
 ```
 
+### supportSender v1.2
+
+*Not yet submitted for review (v1.1 above is the version under review).*
+
+v1.1 plus an **exact split**: the shares always add up to the amounts typed (7 spies over 10 villages = 1 spy from the 7 villages holding the most), and *Fill inputs* / *Fill current target* can be pressed again without deselecting the villages. Fixes: village names that contain coordinates no longer confuse the rows or the target; the sigil counts in the plan's *send by* time and *TOO LATE* check for the current target; two plan orders from the same village are typed together; plan times are shown in server time; a missing target is reported; a broken saved theme colour no longer stops the script; the village list is not downloaded again for coordinates without a village; the mobile site and sitter links are handled. The *pop* column is now labelled *def pop* (heavy cavalry counts 4, spies 0).
+
+```
+javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@main/Pending/supportSenderv1-2.js")
+```
+
 ### incomingOrders v2.0
 
 *Not yet submitted for review.* Same exporter as the approved incomingOrders, but the per-command details (origin, exact arrival, units) are read from the game's lightweight hover-preview data instead of each command's full info page, and requests run asynchronously so the tab never freezes. Same CSV/JSON output, plus `arrival_epoch_ms` in the JSON.

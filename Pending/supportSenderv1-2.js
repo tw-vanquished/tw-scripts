@@ -1,0 +1,1558 @@
+// Original Script Made by Costache Madalin (lllll llll)
+// Discord: costache madalin#8472
+// Original Script Link: https://forum.tribalwars.net/index.php?threads/support-sender.286798/
+//
+// Custom Version by Vanquished -> v1.2 | 2026-10-17
+//
+// Self-contained, no longer pulls data from external sources. All in-game.
+// + Defensive-plan import: paste a per-player defensive support plan.
+// + Troop amounts typed in thousands (k) or in plain units (dropdown).
+// + Land window no longer adds stray rams; shares below 1 unit are kept.
+// + Exact split: the shares add up to exactly the amounts typed; Fill can be pressed again.
+//
+// ################# Disclaimer #################
+// By uploading a user-generated mod for use with Tribal Wars, the creator grants
+// InnoGames a perpetual, irrevocable, worldwide, royalty-free, non-exclusive license
+// to use, reproduce, distribute, publicly display, modify, and create derivative
+// works of the mod. This license permits InnoGames to incorporate the mod into any
+// aspect of the game and its related services, including promotional and commercial
+// endeavors, without any requirement for compensation or attribution to the uploader.
+// The uploader represents and warrants that they have the legal right to grant this
+// license and that the mod does not infringe upon any third-party rights. German law applies.
+//
+
+var heavyCav=4
+
+// Wrong screen: alert + redirect. ssRightScreen gates main() so nothing below
+// touches the missing DOM while the redirect loads. The params are checked
+// separately — the game inserts others between them (order, dir, target, group).
+var ssRightScreen = window.location.href.includes("screen=place") && window.location.href.includes("mode=call")
+if(!ssRightScreen)
+{
+    alert("this script must be run from Rally point-> Mass support");
+    window.location.href=ssLinkBase()+"place&mode=call"
+}
+
+var units = game_data.units.filter(u => u != "snob" && u != "militia" && u != "knight")
+
+function httpGet(theUrl)
+{
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.open( "GET", theUrl, false ); // synchronous — getSpeedConstant needs the result inline
+    xmlHttp.send( null );
+    return xmlHttp.responseText;
+}
+
+var defaultTheme= '[["theme1",["#E0E0E0","#000000","#C5979D","#2B193D","#2C365E","#484D6D","#4B8F8C","50"]],["currentTheme","theme1"],["theme2",["#E0E0E0","#000000","#F76F8E","#113537","#37505C","#445552","#294D4A","50"]],["theme3",["#E0E0E0","#000000","#ACFCD9","#190933","#665687","#7C77B9","#623B5A","50"]],["theme4",["#E0E0E0","#000000","#181F1C","#60712F","#274029","#315C2B","#214F4B","50"]],["theme5",["#E0E0E0","#000000","#9AD1D4","#007EA7","#003249","#1F5673","#1C448E","50"]],["theme6",["#E0E0E0","#000000","#EA8C55","#81171B","#540804","#710627","#9E1946","50"]],["theme7",["#E0E0E0","#000000","#754043","#37423D","#171614","#3A2618","#523A34","50"]],["theme8",["#E0E0E0","#000000","#9E0031","#8E0045","#44001A","#600047","#770058","50"]],["theme9",["#E0E0E0","#000000","#C1BDB3","#5F5B6B","#323031","#3D3B3C","#575366","50"]],["theme10",["#E0E0E0","#000000","#E6BCCD","#29274C","#012A36","#14453D","#7E52A0","50"]]]'
+var localStorageThemeName = "supportSenderTheme"
+// migrate themes stored before widthInterface joined the colour list (7 → 8 entries).
+// An unreadable store (corrupt JSON, not a list of pairs) is replaced by the default
+// themes here, first: every later read parses it again, and a throw would stop the script.
+if(localStorage.getItem(localStorageThemeName)!=undefined){
+    try{
+        let mapTheme = new Map(JSON.parse(localStorage.getItem(localStorageThemeName)))
+        Array.from(mapTheme.keys()).forEach((key)=>{
+            if(key!="currentTheme"){
+                let listColors=mapTheme.get(key);
+                if(Array.isArray(listColors) && listColors.length == 7){
+                    listColors.push(50);
+                    mapTheme.set(key,listColors)
+                }
+            }
+        })
+        localStorage.setItem(localStorageThemeName, JSON.stringify(Array.from(mapTheme.entries())))
+    }catch(e){
+        localStorage.setItem(localStorageThemeName, defaultTheme)
+    }
+}
+
+var textColor="#ffffff"
+var backgroundInput="#000000"
+
+var borderColor = "#C5979D"
+var backgroundContainer="#2B193D"
+var backgroundHeader="#2C365E"
+var backgroundMainTable="#484D6D"
+var backgroundInnerTable="#4B8F8C"
+
+var widthInterface=50;//percentage
+var headerColorDarken=-50 //percentage; -(darker) +(lighter)
+var headerColorAlternateTable=-30;
+var headerColorAlternateHover=30;
+
+function main(){
+    initializationTheme()
+    addCssStyle()
+    createMainInterface()
+    changeTheme()
+    addEvents()
+    ssRestorePlan()
+    ssRenderPlanStatus()
+    ssResolveTargetIds() // fill any village IDs still missing from the cache
+}
+
+function getColorDarker(hexInput, percent) {
+    let hex = hexInput.replace(/^\s*#|\s*$/g, "");
+
+    // convert 3 char codes --> 6, e.g. `E0F` --> `EE00FF`
+    if (hex.length === 3) {
+        hex = hex.replace(/(.)/g, "$1$1");
+    }
+
+    let r = parseInt(hex.substr(0, 2), 16);
+    let g = parseInt(hex.substr(2, 2), 16);
+    let b = parseInt(hex.substr(4, 2), 16);
+
+    const calculatedPercent = (100 + percent) / 100;
+
+    r = Math.round(Math.min(255, Math.max(0, r * calculatedPercent)));
+    g = Math.round(Math.min(255, Math.max(0, g * calculatedPercent)));
+    b = Math.round(Math.min(255, Math.max(0, b * calculatedPercent)));
+
+    return `#${("00"+r.toString(16)).slice(-2).toUpperCase()}${("00"+g.toString(16)).slice(-2).toUpperCase()}${("00"+b.toString(16)).slice(-2).toUpperCase()}`
+}
+
+function invertColor(hex) {
+    if (hex.indexOf('#') === 0) {
+        hex = hex.slice(1);
+    }
+    // convert 3-digit hex to 6-digits.
+    if (hex.length === 3) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    if (hex.length !== 6) {
+        throw new Error('Invalid HEX color.');
+    }
+    var r = (255 - parseInt(hex.slice(0, 2), 16)).toString(16),
+        g = (255 - parseInt(hex.slice(2, 4), 16)).toString(16),
+        b = (255 - parseInt(hex.slice(4, 6), 16)).toString(16);
+    return '#' + padZero(r) + padZero(g) + padZero(b);
+}
+
+function padZero(str, len) {
+    len = len || 2;
+    var zeros = new Array(len).join('0');
+    return (zeros + str).slice(-len);
+}
+
+function addCssStyle(){
+    let cssStyle =`
+    .scriptContainer{
+        width: ${widthInterface}%;
+        background: ${backgroundContainer};
+        cursor:move;
+        z-index:50;
+        border-radius: 15px;
+
+        border-style: solid;
+        border-width: 5px 5px;
+        border-color:${backgroundHeader};
+
+    }
+    .scriptHeader{
+        color: ${textColor};
+        background: ${backgroundHeader};
+        width: 100%;
+        margin: 0 auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .scriptFooter{
+        color: ${textColor};
+        background: ${backgroundHeader};
+        width: 100%;
+        margin: 0 auto;
+        display: flex;
+        justify-content: right;
+        align-items: center;
+        margin-right:50px;
+    }
+
+
+    .scriptTable{
+        position: relative;
+        width: 95%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        margin: 0 auto;
+        margin-top:20px;
+        margin-bottom:20px;
+
+    }
+    .scriptTable td{
+        width: auto;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border-style: solid;
+        border-width: 1px 1px;
+        border-color: ${borderColor};
+        padding:10px;
+        text-align: center;
+        color: ${textColor};
+        word-wrap: break-word;
+
+    }
+    .scriptTable tr:nth-child(odd){
+        background: ${getColorDarker(backgroundMainTable,headerColorAlternateTable)};
+    }
+    .scriptTable tr:nth-child(even){
+        background: ${backgroundMainTable};
+    }
+
+    .scriptTable tr:first-child{
+        width: auto;
+        border-style: solid;
+        border-width: 1px 1px;
+        border-color: ${borderColor};
+        padding:15px;
+        text-align: center;
+        color: ${textColor};
+        background: ${getColorDarker(backgroundMainTable,headerColorDarken)};
+    }
+    .scriptTable tr:not(:first-child):hover {
+        background-color: ${getColorDarker(backgroundMainTable,headerColorAlternateHover)};
+    }
+
+
+    .scriptInput {
+        width:50%;
+        font-size: 15px;
+        background-color : ${backgroundInput};
+        border-radius: 10px;
+        color:${textColor};
+        text-align: center;
+
+    }
+    input[type="text"]:disabled {
+        background: ${getColorDarker(invertColor(textColor),50)};
+        text-align: center;
+    }
+    select {
+        background: ${backgroundInput};
+        color: ${textColor};
+        border-radius: 5px;
+        width:50%;
+        text-align:center;
+        font-size:15px;
+    }
+    `
+    let style = document.createElement('style');
+    style.textContent = cssStyle;
+    document.head.appendChild(style);
+}
+
+function createMainInterface(){
+    let hasArcher = game_data.units.includes("archer")
+    let rowsSpawnButtons = hasArcher ? 7 : 6;
+    let rowsSpawnDatetimes = hasArcher ? 4 : 3;
+    // the units the mass-support form deals in: the world's defensive units + spy
+    let fmUnits = units.filter(u => !["axe","light","ram","catapult","marcher"].includes(u))
+
+    let html=`
+    <div id="div_container" class="scriptContainer">
+        <div class="scriptHeader">
+            <div style=" margin-top:10px;"><h2>Support sender</h2></div>
+            <div style="position:absolute;top:10px;right: 10px;"><a href="#" onclick="$('#div_container').remove()" style="font-size:18px;text-decoration:none;">❌</a></div>
+            <div style="position:absolute;top:10px;right: 35px;" id="div_minimize"><a href="#" style="font-size:18px;text-decoration:none;">➖</a></div>
+            <div style="position:absolute;top:10px;right: 60px;" id="div_theme"><a href="#" onclick="$('#theme_settings').toggle()" style="font-size:18px;text-decoration:none;">🎨</a></div>
+        </div>
+
+        <div id="theme_settings"></div>
+
+        <div id="div_body">
+            <table id="table_upload" class="scriptTable">
+                <tr>
+                    <td>troops<br>
+                        <select id="ss_scale" title="type troop amounts in thousands (k) or in plain units" style="width:100%;max-width:100%;font-size:12px;">
+                            <option value="k">k</option>
+                            <option value="units">units</option>
+                        </select>
+                    </td>
+                    ${fmUnits.map(u=>`<td class="fm_unit"><img src="/graphic/unit/unit_${u}.webp"></td>`).join("")}
+                    <td title="defensive pop: spear/sword/archer 1, heavy 4, spies 0 (not farm space: heavy uses 6, a spy 2). An amount typed here is split over the non-spy units.">def pop</td>
+                </tr>
+                <tr id="totalTroops">
+                    <td>total</td>
+                    ${fmUnits.map(u=>`
+                    <td>
+                        <input id="${u}total" value="0" type="text" class="totalTroops scriptInput" disabled>
+                        <font color="${textColor}" class="hideMobile ss_k">k</font>
+                    </td>`).join("")}
+                    <td>
+                        <input id="packets_total" value="0" type="text" class="scriptInput" disabled>
+                        <font color="${textColor}" class="hideMobile ss_k">k</font>
+                    </td>
+                </tr>
+                <tr id="sendTroops">
+                    <td>send</td>
+                    ${fmUnits.map(u=>`
+                    <td align="center">
+                        <input id="${u}send" value="0" type="number" class="scriptInput sendTroops">
+                        <font color="${textColor}" class="hideMobile ss_k">k</font>
+                    </td>`).join("")}
+                    <td align="center">
+                        <input id="packets_send" value="0" type="number" class="scriptInput">
+                        <font color="${textColor}" class="hideMobile ss_k">k</font>
+                    </td>
+                </tr>
+                <tr id="reserveTroops">
+                    <td>reserve</td>
+                    ${fmUnits.map(u=>`
+                    <td align="center">
+                        <input id="${u}Reserve" value="0" type="number" class="scriptInput reserveTroops">
+                        <font color="${textColor}" class="hideMobile ss_k">k</font>
+                    </td>`).join("")}
+                    <td align="center">
+                        <input id="packets_reserve" value="0" type="text" class="scriptInput" disabled>
+                        <font color="${textColor}" class="hideMobile ss_k">k</font>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="1">
+                        <center><font color="${textColor}"> sigil:</font><input type="number" id="flag_boost" class="scriptInput" min="0" max="100" placeholder="0" value="0" style="text-align: center"></center>
+                    </td>
+                    <td colspan="2">
+                        <center><input type="checkbox" id="checkbox_window" value="land_specific"><font color="${textColor}"> packets land between:</font> </center>
+                    </td>
+                    <td colspan="${rowsSpawnDatetimes}">
+                        <center style="margin:5px">start:<input type="datetime-local" id="start_window" style="text-align:center;" ></center>
+                        <center style="margin:5px">end:  <input type="datetime-local" id="stop_window" style="text-align:center;" ></center>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan='${rowsSpawnButtons}'>
+                        <button type="button" class="btn evt-confirm-btn btn-confirm-yes" onclick="fillInputs()">Fill inputs</button>
+                        <button type="button" class="btn evt-confirm-btn btn-confirm-yes" onclick="countTotalTroops()">Calculate</button>
+                    </td>
+
+                </tr>
+            </table>
+            <table id="table_plan" class="scriptTable">
+                <tr>
+                    <td colspan="3">Defensive plan (tribe-calculator)</td>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                        <textarea id="ss_plan_text" rows="4" placeholder="paste your SUPPORTPLAN export here" style="width:95%;background-color:${backgroundInput};color:${textColor};border-radius:10px;resize:vertical;"></textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                        <button type="button" class="btn evt-confirm-btn btn-confirm-yes" onclick="ssLoadPlanClick()">Load plan</button>
+                        <button type="button" class="btn evt-confirm-btn btn-confirm-yes" onclick="ssFillCurrentTarget()">Fill current target</button>
+                        <button type="button" class="btn evt-confirm-btn btn-confirm-yes" onclick="ssClearPlanClick()">Clear plan</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="3" style="text-align:left;"><div id="ss_plan_status"></div></td>
+                </tr>
+            </table>
+        </div>
+        <div class="scriptFooter">
+            <div style=" margin-top:5px;"><h5>made by Costache · maintained by Vanquished</h5></div>
+        </div>
+    </div>`
+
+    $("#div_container").remove()
+    $("#contentContainer").eq(0).prepend(html);
+    $("#mobileContent").eq(0).prepend(html); // mobile layout has its own content root
+
+    $("#div_container").css("position","fixed");
+    $("#div_container").draggable();
+
+    $("#div_minimize").on("click",()=>{
+        let currentWidthPercentage=Math.ceil($('#div_container').width() / $('body').width() * 100);
+        if(currentWidthPercentage >=widthInterface ){
+            $('#div_container').css({'width' : '10%'});
+            $('#div_body').hide();
+        }
+        else{
+            $('#div_container').css({'width' : `${widthInterface}%`});
+            $('#div_body').show();
+        }
+    })
+
+    // saved as [checkboxes, inputs, scaleMode]. Troop fields are always saved in k,
+    // whatever the mode, so the v1.0 copy (same key, no 3rd slot) reads them right;
+    // a blob without the 3rd slot restores in k.
+    const settingsKey = game_data.world+"support_sender_settings2"
+    const savedSettings = localStorage.getItem(settingsKey)
+    if(savedSettings != null){
+        const [list_checkbox, list_input, scaleMode] = JSON.parse(savedSettings)
+        ssScaleMode = (scaleMode == "units") ? "units" : "k"
+        $('#table_upload input[type=checkbox]').each(function (index) {
+            this.checked=list_checkbox[index]
+        });
+        $('#table_upload input').each(function (index) {
+            let saved = list_input[index]
+            this.value = (ssScaleMode == "units" && ssIsTroopField(this)) ? ssRescale(saved, "units") : saved
+        });
+        // totals are stale from the last session — recalculated on demand
+        $('.totalTroops').each(function () {
+            this.value=0
+        });
+        $("#packets_total").val(0)
+    }
+    $("#ss_scale").val(ssScaleMode)
+    $(".ss_k").text(ssScaleMode == "units" ? "" : "k")
+
+    const saveSettings = () => {
+        let list_checkbox=[]
+        let list_input=[]
+        $('#table_upload input[type=checkbox]').each(function () {
+            list_checkbox.push(this.checked)
+        });
+        $('#table_upload input').each(function () {
+            list_input.push((ssScaleMode == "units" && ssIsTroopField(this)) ? ssRescale(this.value, "k") : this.value)
+        });
+
+        let data=JSON.stringify([list_checkbox,list_input,ssScaleMode])
+        if(data!=localStorage.getItem(settingsKey)){
+            localStorage.setItem(settingsKey,data)
+        }
+    }
+    // saved first: a redraw that throws must not lose the edit. Quiet: before a
+    // target is chosen, typing doesn't raise the "no target" message each keystroke.
+    $("#table_upload input[type=checkbox], #table_upload input").on("click input change",()=>{
+        saveSettings()
+        countTotalTroops(true)
+    })
+    // the plan list's send-by for the current target counts the sigil: redraw it on edits
+    $("#flag_boost").on("input",()=>{ if(ssPlan) ssRenderPlanStatus(ssLastFill) })
+    // k ↔ units: the typed amounts keep their meaning (0.5 k ↔ 500), totals redrawn.
+    // A <select>, not an <input>: the saved inputs list is positional.
+    $("#ss_scale").on("change",function(){
+        let mode = (this.value == "units") ? "units" : "k"
+        if(mode == ssScaleMode) return
+        $('#table_upload input').each(function () {
+            if(ssIsTroopField(this)) this.value = ssRescale(this.value, mode)
+        });
+        ssScaleMode = mode
+        $(".ss_k").text(mode == "units" ? "" : "k")
+        saveSettings()
+        countTotalTroops(true)
+    })
+
+    if(ssIsMobile()){
+        $(".hideMobile").hide()
+        $("#table_upload").find("input[type=text]").css("width","100%")
+    }
+}
+
+function changeTheme(){
+    let html= `
+    <h3 style="color:${textColor};padding-left:10px;padding-top:5px">after theme is selected run the script again<h3>
+    <table class="scriptTable" >
+
+        <tr>
+            <td>
+                <select  id="select_theme">
+                    <option value="theme1">theme1</option>
+                    <option value="theme2">theme2</option>
+                    <option value="theme3">theme3</option>
+                    <option value="theme4">theme4</option>
+                    <option value="theme5">theme5</option>
+                    <option value="theme6">theme6</option>
+                    <option value="theme7">theme7</option>
+                    <option value="theme8">theme8</option>
+                    <option value="theme9">theme9</option>
+                    <option value="theme10">theme10</option>
+                </select>
+            </td>
+            <td>value</td>
+            <td >color hex</td>
+        </tr>
+        <tr>
+            <td>textColor</td>
+            <td style="background-color:${textColor}" class="td_background"></td>
+            <td><input type="text" class="scriptInput input_theme" value="${textColor}"></td>
+        </tr>
+        <tr>
+            <td>backgroundInput</td>
+            <td style="background-color:${backgroundInput}" class="td_background"></td>
+            <td><input type="text" class="scriptInput input_theme" value="${backgroundInput}"></td>
+        </tr>
+        <tr>
+            <td>borderColor</td>
+            <td style="background-color:${borderColor}" class="td_background"></td>
+            <td><input type="text" class="scriptInput input_theme" value="${borderColor}"></td>
+        </tr>
+        <tr>
+            <td>backgroundContainer</td>
+            <td style="background-color:${backgroundContainer}" class="td_background"></td>
+            <td><input type="text" class="scriptInput input_theme" value="${backgroundContainer}"></td>
+        </tr>
+        <tr>
+            <td>backgroundHeader</td>
+            <td style="background-color:${backgroundHeader}" class="td_background"></td>
+            <td><input type="text" class="scriptInput input_theme" value="${backgroundHeader}"></td>
+        </tr>
+        <tr>
+            <td>backgroundMainTable</td>
+            <td style="background-color:${backgroundMainTable}" class="td_background"></td>
+            <td><input type="text" class="scriptInput input_theme" value="${backgroundMainTable}"></td>
+        </tr>
+        <tr>
+            <td>backgroundInnerTable</td>
+            <td style="background-color:${backgroundInnerTable}" class="td_background"></td>
+            <td><input type="text" class="scriptInput input_theme" value="${backgroundInnerTable}"></td>
+        </tr>
+        <tr>
+            <td>widthInterface</td>
+            <td><input type="range" min="25" max="100" class="slider input_theme" id="input_slider_width" value="${widthInterface}"></td>
+            <td id="td_width">${widthInterface}%</td>
+        </tr>
+        <tr >
+            <td><input class="btn evt-confirm-btn btn-confirm-yes" type="button" id="btn_save_theme" value="Save"></td>
+            <td><input class="btn evt-confirm-btn btn-confirm-yes" type="button" id="btn_reset_theme" value="Default themes"></td>
+            <td></td>
+        </tr>
+
+    </table>
+    `
+    $("#theme_settings").append(html)
+    $("#theme_settings").hide()
+
+    let selectedTheme = ""
+    let colours =[]
+    let mapTheme = new Map()
+
+    $("#select_theme").on("change",()=>{
+        if(localStorage.getItem(localStorageThemeName) != undefined){
+            selectedTheme = $('#select_theme').find(":selected").text();
+            mapTheme = new Map(JSON.parse(localStorage.getItem(localStorageThemeName)))
+            colours = mapTheme.get(selectedTheme)
+            Array.from($(".input_theme")).forEach((elem,index)=>{
+                elem.value = colours[index]
+            })
+            Array.from($(".td_background")).forEach((elem,index)=>{
+                elem.style.background = colours[index]
+            })
+
+            mapTheme.set("currentTheme",selectedTheme)
+            localStorage.setItem(localStorageThemeName, JSON.stringify(Array.from(mapTheme.entries())))
+        }
+    })
+
+    $("#btn_save_theme").on("click",()=>{
+        colours = Array.from($(".input_theme")).map(elem=>elem.value.toUpperCase().trim())
+        selectedTheme = $('#select_theme').find(":selected").text();
+
+        for(let i=0;i<colours.length-1;i++){
+            if(!ssIsHexColour(colours[i])){
+                UI.ErrorMessage("wrong colour: "+colours[i])
+                throw new Error("wrong colour")
+            }
+        }
+
+        if(localStorage.getItem(localStorageThemeName) != undefined)
+            mapTheme = new Map(JSON.parse(localStorage.getItem(localStorageThemeName)))
+
+        mapTheme.set(selectedTheme,colours)
+        mapTheme.set("currentTheme",selectedTheme)
+
+        localStorage.setItem(localStorageThemeName, JSON.stringify(Array.from(mapTheme.entries())))
+        UI.SuccessMessage(`saved colours for: ${selectedTheme} \n run the script again`,1000)
+    })
+
+    $("#btn_reset_theme").on("click",()=>{
+        localStorage.setItem(localStorageThemeName, defaultTheme)
+        UI.SuccessMessage("run the script again",1000)
+    })
+
+    $("#input_slider_width").on("input",()=>{
+        $("#td_width").text($("#input_slider_width").val()+"%")
+    })
+
+    if(localStorage.getItem(localStorageThemeName) != undefined){
+        mapTheme = new Map(JSON.parse(localStorage.getItem(localStorageThemeName)))
+        document.querySelector('#select_theme').value=mapTheme.get("currentTheme")
+    }
+}
+
+// exactly #RRGGBB — what the theme editor saves and invertColor can read
+function ssIsHexColour(c){
+    return typeof c == "string" && /^#[0-9A-F]{6}$/i.test(c)
+}
+
+function initializationTheme(){
+    if(localStorage.getItem(localStorageThemeName) == undefined){
+        localStorage.setItem(localStorageThemeName, defaultTheme)
+    }
+
+    let mapTheme = new Map(JSON.parse(localStorage.getItem(localStorageThemeName)))
+    let colours = mapTheme.get(mapTheme.get("currentTheme"))
+    // a missing theme, or a bad colour the old save check let through ("#FFFFFFF"),
+    // made invertColor throw and the window never drew → a missing theme uses the
+    // default one; a bad colour is replaced by that theme's default for this run only.
+    // The editor shows what's drawn, so Save keeps the other colours and fixes the bad one.
+    let defaults = new Map(JSON.parse(defaultTheme))
+    let fallback = defaults.get(mapTheme.get("currentTheme")) || defaults.get("theme1")
+    if(!Array.isArray(colours)){
+        colours = fallback
+        UI.ErrorMessage("saved theme not found — default colours used", 3000)
+    }
+    else{
+        let names = ["textColor","backgroundInput","borderColor","backgroundContainer","backgroundHeader","backgroundMainTable","backgroundInnerTable"]
+        let bad = names.filter((n, i) => !ssIsHexColour(colours[i]))
+        let width = Number(colours[7]) // the slider's 25…100; anything else never reaches the page
+        let widthOk = width >= 25 && width <= 100
+        if(bad.length || !widthOk){
+            colours = fallback.map((c, i) => i < 7 ? (ssIsHexColour(colours[i]) ? colours[i] : c) : (widthOk ? width : c))
+            if(bad.length) UI.ErrorMessage(`invalid theme colour (${bad.join(", ")}) — default used for it (🎨 → Save to fix it)`, 3000)
+        }
+    }
+
+    textColor=colours[0]
+    backgroundInput=colours[1]
+    borderColor = colours[2]
+    backgroundContainer=colours[3]
+    backgroundHeader=colours[4]
+    backgroundMainTable=colours[5]
+    backgroundInnerTable=colours[6]
+    widthInterface=colours[7]
+
+    if(ssIsMobile()){
+        widthInterface = 98
+    }
+}
+
+// ── troop amounts in the form: thousands ("k", the original behaviour) or plain
+// units, picked with the #ss_scale dropdown and saved with the settings ──
+var ssScaleMode = "k"
+
+function ssScale(){
+    return (ssScaleMode == "units") ? 1 : 1000
+}
+
+// typed form value → whole troops (empty / garbage = 0)
+function ssToTroops(str){
+    let n = Math.round(parseFloat(str) * ssScale())
+    return Number.isNaN(n) ? 0 : n
+}
+
+// troop count → form value; k keeps 3 decimals so a shown total is exact
+// (fillInputs checks the send against it)
+function ssFmt(n){
+    return (ssScaleMode == "units") ? String(Math.round(n)) : (n/1000).toFixed(3)
+}
+
+// one typed value re-expressed in the other mode (0.5 k ↔ 500), in whole troops;
+// empty/garbage kept
+function ssRescale(str, toMode){
+    let n = parseFloat(str)
+    if(Number.isNaN(n)) return str
+    return (toMode == "units") ? String(Math.round(n*1000)) : String(Math.round(n)/1000)
+}
+
+// the typed troop fields: send + reserve rows and the pop-to-send box
+function ssIsTroopField(el){
+    return el.id == "packets_send" || el.classList.contains("sendTroops") || el.classList.contains("reserveTroops")
+}
+
+// ── per-village land-window logic (pure; obj = one countTotalTroops() entry:
+// unit counts after reserve + "<unit>_speed" for each unit the village has that
+// lands inside the window) ──
+
+// What one village adds to the Calculate totals — its slowest unit still in the
+// window decides: rams/cats/swords bring everything, spears/archers everything but
+// swords, heavies only heavies+spies, spies only spies. null = nothing lands.
+function ssVillageTotals(obj){
+    let tier = (obj.ram_speed != undefined || obj.catapult_speed != undefined || obj.sword_speed != undefined) ? 3
+             : (obj.spear_speed != undefined || obj.archer_speed != undefined) ? 2
+             : (obj.heavy_speed != undefined) ? 1
+             : (obj.spy_speed != undefined) ? 0 : -1
+    if(tier < 0) return null
+    return {
+        spy: obj.spy,
+        heavy: tier >= 1 ? obj.heavy : 0,
+        spear: tier >= 2 ? obj.spear : 0,
+        archer: (tier >= 2 && obj.archer != undefined) ? obj.archer : 0,
+        sword: tier >= 3 ? obj.sword : 0
+    }
+}
+
+// unit speed orders; equal-speed ties keep ram before catapult and spear before archer
+var ssSlowestFirst = ["ram","catapult","sword","spear","archer","heavy","spy"]
+var ssFastestFirst = ["spy","heavy","spear","archer","sword","ram","catapult"]
+
+// Pace-setter of one village's packet (a packet moves at its slowest unit): the
+// slowest unit actually being SENT that lands inside the window; only if none of
+// those does, the fastest unit of any kind that lands there — the one case where an
+// extra unit has to ride along to delay the packet. So 1 ram/cat is the last resort,
+// never added while a sent unit already lands in the window by itself.
+// undefined = nothing of this village lands in the window.
+function ssPickPace(obj, sendTotalObj){
+    let lands = u => obj[u+"_speed"] != undefined
+    return ssSlowestFirst.find(u => lands(u) && sendTotalObj[u] > 0)      // slowest sent unit that lands
+        || ssFastestFirst.find(lands)                                     // else the fastest lander
+}
+
+// After the distribution: if the slowest unit this village actually got to send
+// doesn't land in the window on its own (its share can round to 0, or the whole
+// send arrives too early), add exactly 1 of the fastest unit that does land — the
+// packet then moves at that unit's speed. Nothing added when the village sends
+// nothing or when its packet already lands. Returns the unit added, else null.
+function ssForcePace(sent, obj){
+    let lands = u => obj[u+"_speed"] != undefined
+    let slowest = ssSlowestFirst.find(u => sent[u] > 0)
+    if(slowest == undefined || lands(slowest)) return null
+    let pace = ssFastestFirst.find(lands)
+    if(pace == undefined) return null
+    sent[pace] = 1
+    return pace
+}
+
+// Per-village send caps for fillInputs' distribution: units slower than the pace
+// stay home, units not being sent stay home. Rams/cats never count as sent here —
+// a pace-setting ram is added by ssForcePace once the shares are known.
+function ssVillageSend(obj, sendTotalObj){
+    let objTotal = {}
+    let speed = ssPickPace(obj, sendTotalObj)
+    if(speed != undefined){
+        let stayHome = {
+            ram: [], catapult: [], sword: [],
+            spear: ["sword"], archer: ["sword"],
+            heavy: ["sword","spear"], spy: ["sword","spear","heavy"]
+        }[speed]
+        let gate = u => (stayHome.includes(u) || !(sendTotalObj[u] > 0)) ? 0 : obj[u]
+
+        objTotal.speedTroop = speed
+        objTotal.ram = 0
+        objTotal.catapult = 0
+        objTotal.sword = gate("sword")
+        objTotal.spear = gate("spear")
+        objTotal.heavy = gate("heavy")
+        objTotal.spy = (speed == "heavy") ? obj.spy : gate("spy") // heavy-paced sends always take the spies along
+        if(obj.archer != undefined)
+            objTotal.archer = (speed == "heavy" || speed == "spy") ? 0 : gate("archer")
+    }
+    objTotal.axe = 0
+    objTotal.light = 0
+    if(obj.marcher != undefined)
+        objTotal.marcher = 0
+    return objTotal
+}
+
+// Exact split of `total` troops of one unit over the villages, caps[i] = the most
+// village i can send: even shares; a village that can't cover its share sends all
+// it can and the others share the rest; what an uneven split leaves over goes one
+// each to the villages with the most of that unit (ties: the one listed first).
+// The shares add up to the total (to all the caps, if the total is more than that):
+// 7 spies over 10 villages = 1 spy from 7 of them, never a random 0…10.
+function ssSplitExact(caps, total){
+    caps = caps.map(c => (c > 0 ? Math.floor(c) : 0))
+    let shares = caps.map(() => 0)
+    let order = caps.map((c, i) => i).sort((a, b) => caps[a] - caps[b]) // smallest first (stable)
+    let left = total > 0 ? total : 0
+    for(let k = 0; k < order.length; k++){
+        let i = order[k], m = order.length - k
+        if(caps[i] * m < left){ // can't cover an even share of what's left
+            shares[i] = caps[i]
+            left -= caps[i]
+            continue
+        }
+        // this village and every bigger one can: even split, the leftover to the biggest
+        let base = Math.floor(left / m)
+        order.slice(k).sort((a, b) => caps[b] - caps[a] || a - b)
+            .forEach((j, n) => { shares[j] = base + (n < left - base * m ? 1 : 0) })
+        break
+    }
+    return shares
+}
+
+// quiet = the redraw after each edit in the form: no "no target" message there,
+// only from the Calculate / Fill inputs buttons. null = no target village yet.
+function countTotalTroops(quiet){
+    let coordDestination = ssCurrentTargetCoord()
+    if(!coordDestination){
+        if(!quiet) UI.ErrorMessage("no target village found — choose the target first", 3000)
+        return null
+    }
+
+    // no land window checked → accept everything (±1 year around now)
+    let dateStart = new Date()
+    let dateStop = new Date()
+    dateStart.setFullYear(dateStart.getFullYear()-1)
+    dateStop.setFullYear(dateStop.getFullYear()+1)
+
+    let sigil = 0;
+    let timeWindow = document.getElementById("checkbox_window").checked
+    if(timeWindow){
+        dateStart = new Date(document.getElementById("start_window").value)
+        dateStop = new Date(document.getElementById("stop_window").value)
+        sigil = ssSigilPct()
+
+        if(dateStart == "Invalid Date")
+            UI.ErrorMessage("start date has an invalid format",2000)
+        if(dateStop == "Invalid Date")
+            UI.ErrorMessage("stop date has an invalid format",2000)
+    }
+
+    let sc = getSpeedConstant()
+    let msPerField = 1000 / (sc.worldSpeed * sc.unitSpeed)
+    let speedTroop = {
+        snob: 2100 * msPerField,
+        ram: 1800 * msPerField,
+        catapult: 1800 * msPerField,
+        sword: 1320 * msPerField,
+        axe: 1080 * msPerField,
+        spear: 1080 * msPerField,
+        archer: 1080 * msPerField,
+        heavy: 660 * msPerField,
+        light: 600 * msPerField,
+        marcher: 600 * msPerField,
+        knight: 600 * msPerField,
+        spy: 540 * msPerField
+    }
+    let nowMs = ssServerNowMs()
+
+    let mapVillages = new Map()
+    Array.from($("#village_troup_list tbody tr")).forEach(row => {
+        let coord = ssCoordOf(row.children[0].innerText)
+        if(!coord) return
+        let distance = calcDistance(coord, coordDestination)
+        let objTroops = {
+            distance: distance
+        }
+
+        units.forEach(troopName => {
+            let totalTroops = parseInt($(row).find(`[data-unit='${troopName}']`).text())
+            let reserveTroops = ssToTroops($(`#${troopName}Reserve`).val())
+            totalTroops = (totalTroops > reserveTroops) ? totalTroops - reserveTroops : 0
+
+            let arriveMs = nowMs + speedTroop[troopName] * distance / (1 + sigil / 100.0)
+            if(totalTroops > 0 && dateStart.getTime() < arriveMs && arriveMs < dateStop.getTime()){
+                objTroops[troopName+"_speed"] = troopName
+            }
+            objTroops[troopName] = totalTroops
+        })
+        if(!timeWindow){
+            delete objTroops.ram
+            delete objTroops.catapult
+            delete objTroops.ram_speed
+            delete objTroops.catapult_speed
+        }
+        mapVillages.set(coord, objTroops)
+    })
+
+    let objTroopsTotal = {
+        spear: 0,
+        sword: 0,
+        archer: 0,
+        spy: 0,
+        heavy: 0
+    }
+    mapVillages.forEach(obj => {
+        let add = ssVillageTotals(obj)
+        if(add) Object.keys(objTroopsTotal).forEach(u => objTroopsTotal[u] += add[u])
+    })
+
+    if(!game_data.units.includes("archer"))
+        delete objTroopsTotal.archer
+
+    let totalPop = 0;
+    Object.keys(objTroopsTotal).forEach(key=>{
+        if(units.includes(key)){
+            document.getElementById(key+"total").value=ssFmt(objTroopsTotal[key])
+        }
+        if(key=="spear" || key=="sword" || key=="archer"){
+            totalPop+=objTroopsTotal[key]
+        }
+        else if(key =='heavy')
+            totalPop+=objTroopsTotal[key]*heavyCav;
+    })
+
+    document.getElementById("packets_total").value=ssFmt(totalPop)
+    return mapVillages;
+}
+
+// Select every village row through the game's own select-all box. Its change handler
+// sets every row's tick to the box's state, and a row unticked by hand leaves the box
+// ticked. So: box on and every row selected (Fill pressed again) → nothing to do; box
+// on but some rows unticked → off first, then on — the shares are split over every
+// village, so every village must be typed into. false = still no row selected.
+function ssSelectAllVillages(){
+    let box = document.getElementById("place_call_select_all")
+    let rows = $("#village_troup_list .troop-request-selector").length
+    let picked = () => $("#village_troup_list tr.selected").length
+    if(box && box.checked && picked() < rows) box.click()
+    if(box && !box.checked) box.click()
+    return picked() > 0
+}
+
+function fillInputs(){
+    let mapVillages = countTotalTroops()
+    if(!mapVillages) return // no target village (countTotalTroops said so)
+
+    let troopsTotal = Array.from(document.getElementsByClassName("totalTroops")).map(e=>ssToTroops(e.value))
+    let sendTotal = Array.from(document.getElementsByClassName("sendTroops")).map(e => ({
+        value: ssToTroops(e.value),
+        troopName: e.id.replace("send", "")
+    }))
+    let sendTotalObj = {}
+    sendTotal.forEach(e=>{
+        sendTotalObj[e.troopName] = e.value
+    })
+
+    for(let i=0;i<troopsTotal.length;i++){
+        if(troopsTotal[i] < sendTotal[i].value){
+            alert("wrong input\n not enough troops");
+            return;
+        }
+    }
+
+    // select every village, zero every unit box (hidden ones too — an unticked column
+    // can still hold an earlier fill), then type the computed counts below. The game's
+    // unit-filter header is left as it is: ticking it from here never reached the game
+    // (no change event — its auto-fill keeps the player's saved filter), it only made
+    // the header show a filter that wasn't in effect.
+    if(!ssSelectAllVillages()){
+        UI.ErrorMessage("no village could be selected — tick the villages, then press Fill inputs again", 3000)
+        return
+    }
+    $("#village_troup_list").find('input[type=number]:visible, tbody input[class*="call-unit-box-"]').val(0)
+
+    let listTotal = []
+    Array.from(mapVillages.keys()).forEach(key=>{
+        listTotal.push(Object.assign({coord: key}, ssVillageSend(mapVillages.get(key), sendTotalObj)))
+    })
+
+    let listTotalRange = listTotal.filter(row => row.speedTroop != undefined)
+
+    // each unit split exactly over the villages whose packet lands (ssSplitExact)
+    sendTotal.forEach(({troopName, value}) => {
+        let shares = ssSplitExact(listTotalRange.map(row => row[troopName]), value)
+        listTotalRange.forEach((row, i) => {
+            if(row[troopName] != undefined) row[troopName] = shares[i]
+        })
+    })
+    let mapResult = new Map(listTotalRange.map(row => [row.coord, row]))
+
+    let timeWindow = document.getElementById("checkbox_window").checked
+    // shares known → per village, add 1 pace-setter only where the packet would
+    // otherwise arrive before the window (window off: everything lands, no-op)
+    let paced = new Map() // coord → the unit added
+    if(timeWindow)
+        listTotalRange.forEach(row => {
+            let unit = ssForcePace(row, mapVillages.get(row.coord))
+            if(unit) paced.set(row.coord, unit)
+        })
+
+    let typed = {}, added = {}
+    Array.from($(".overview_table .selected")).forEach(row=>{
+        let coord = ssCoordOf(row.children[0].innerText)
+        if(mapResult.has(coord)){
+            let obj = mapResult.get(coord)
+            let totalTroopCount = 0
+            Object.keys(obj).forEach(troopName=>{
+                if(troopName != "speedTroop" && troopName != "coord")
+                    totalTroopCount += obj[troopName]
+            })
+
+            if(totalTroopCount > 0){
+                Object.keys(obj).forEach(troopName=>{
+                    if(troopName != "speedTroop" && troopName != "coord"){
+                        $(row).find(`.call-unit-box-${troopName}`).val(obj[troopName])
+                        typed[troopName] = (typed[troopName]||0) + obj[troopName]
+                    }
+                })
+                if(paced.has(coord)) added[paced.get(coord)] = (added[paced.get(coord)]||0) + 1
+            }
+        }
+    })
+
+    // say so when the typed total isn't the amount asked: short (a village that
+    // couldn't be selected) or the land window's pace-setters on top of it
+    let short = sendTotal.filter(e => e.value > 0 && (typed[e.troopName]||0) - (added[e.troopName]||0) < e.value)
+        .map(e => `${(typed[e.troopName]||0) - (added[e.troopName]||0)}/${e.value} ${e.troopName}`)
+    let pace = Object.keys(added).map(u => `+${added[u]} ${u}`).join(", ")
+    if(short.length)
+        UI.ErrorMessage(`only ${short.join(", ")} typed — not every village could be selected` + (pace ? ` (${pace} as pace-setters)` : ""), 5000)
+    else if(pace)
+        UI.SuccessMessage(`filled — ${pace} added as pace-setters, so every packet lands in the window`, 5000)
+}
+
+
+// Bound once, from main(): these inputs are never redrawn (binding them again on
+// every redraw stacked one more copy of both handlers per edit in the form).
+function addEvents(){
+    $('.sendTroops').on('input',function(){
+        let sendTotal=document.getElementsByClassName("sendTroops")
+        let totalPop=0;
+        for(let i=0;i<sendTotal.length;i++){
+            let id=sendTotal[i].id
+            let value=ssToTroops(sendTotal[i].value)
+
+            if(id.includes("spear") || id.includes("sword") || id.includes("archer")){
+                totalPop+=value
+            }
+            if(id.includes("heavy")){
+                totalPop+=value*heavyCav
+            }
+        }
+        document.getElementById("packets_send").value=ssFmt(totalPop)
+    });
+
+    $('#packets_send').on('input',function(){
+        let needTroops=parseFloat(document.getElementById("packets_send").value)
+        let totalPop =parseFloat(document.getElementById("packets_total").value)
+        if(!(totalPop > 0)) return // no totals yet (no target): leave the typed sends alone
+        let sendTotal=document.getElementsByClassName("sendTroops")
+        let totalTroops=document.getElementsByClassName("totalTroops")
+
+        let ratio = needTroops/totalPop
+        for(let i=0;i<totalTroops.length;i++){
+            if(!sendTotal[i].id.includes("spy")){
+                // whole troops, rounded down (the epsilon keeps a full-pop ratio from landing 1 short)
+                let troops = Math.floor(ssToTroops(totalTroops[i].value)*ratio + 1e-6)
+                sendTotal[i].value = troops / ssScale()
+            }
+            else{
+                sendTotal[i].value=0
+            }
+        }
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Defensive-plan import per-player. Format is the following (semicolon-separated, first line is header):
+// <target> and <source> are XXX|YYY coordinates, <units> are integers.
+//
+// SUPPORTPLAN;1;<world>;<player>;spear,sword,spy,heavy
+// <target>;<source>;<spear>;<sword>;<spy>;<heavy>;<arriveMs epoch or empty>
+//
+// The player pastes their per-player export once; it is stored in local storage. On each
+// mass-support target the script fills every planned order (clamped to what the
+// village actually has) — the user reviews and presses the game's send button.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function ssParsePlan(text){
+    const lines = String(text||'').split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length)
+    if(!lines.length) return {ok:false, error:'empty'}
+    const h = lines[0].split(';')
+    if(h[0] !== 'SUPPORTPLAN') return {ok:false, error:'header'}
+    if(h[1] !== '1') return {ok:false, error:'version'}
+    const world = (h[2]||'').trim(), player = (h[3]||'').trim()
+    const unitCols = (h[4]||'').split(',').map(s=>s.trim()).filter(Boolean)
+    if(!unitCols.length) return {ok:false, error:'units'}
+    const coordRe = /^\d{1,3}\|\d{1,3}$/
+    const orders = [], badLines = []
+    for(let i=1;i<lines.length;i++){
+        const p = lines[i].split(';')
+        if(p.length < 2 + unitCols.length){ badLines.push(i+1); continue }
+        const target = p[0].trim(), source = p[1].trim()
+        if(!coordRe.test(target) || !coordRe.test(source)){ badLines.push(i+1); continue }
+        const units = {}
+        let badNum = false
+        unitCols.forEach((u,k)=>{
+            const n = parseInt(p[2+k], 10)
+            if(Number.isNaN(n) || n < 0) badNum = true
+            units[u] = (Number.isNaN(n) || n < 0) ? 0 : n
+        })
+        if(badNum){ badLines.push(i+1); continue }
+        const arriveRaw = (p[2+unitCols.length]||'').trim()
+        let arriveMs = arriveRaw === '' ? null : parseInt(arriveRaw, 10)
+        if(arriveMs !== null && Number.isNaN(arriveMs)) arriveMs = null
+        orders.push({target, source, units, arriveMs})
+    }
+    if(!orders.length) return {ok:false, error:'noorders'}
+    return {ok:true, world, player, unitCols, orders, badLines}
+}
+
+// Unique targets in plan order: [{coord, orders, arriveMs (earliest non-null)}]
+function ssPlanTargets(orders){
+    const seen = new Map()
+    for(const o of orders){
+        let t = seen.get(o.target)
+        if(!t) seen.set(o.target, t = {coord:o.target, orders:0, arriveMs:null})
+        t.orders++
+        if(o.arriveMs != null && (t.arriveMs == null || o.arriveMs < t.arriveMs)) t.arriveMs = o.arriveMs
+    }
+    return Array.from(seen.values())
+}
+
+// Orders merged per source village (and target), in plan order: the mass-support row
+// has one box per unit, so two orders from one village add up and travel as ONE
+// packet — at its slowest unit, by the earliest of their deadlines.
+function ssMergeOrders(orders){
+    const merged = new Map()
+    for(const o of orders){
+        const key = o.target + ";" + o.source
+        let m = merged.get(key)
+        if(!m) merged.set(key, m = {target:o.target, source:o.source, units:{}, arriveMs:null})
+        Object.keys(o.units||{}).forEach(u=>{ m.units[u] = (m.units[u]||0) + (o.units[u]||0) })
+        if(o.arriveMs != null && (m.arriveMs == null || o.arriveMs < m.arriveMs)) m.arriveMs = o.arriveMs
+    }
+    return Array.from(merged.values())
+}
+
+// orders (ONE target) × page rows [{coord, avail:{unit:n}}] → what to type where.
+// Orders from the same source are added up first (ssMergeOrders). Clamps to the row's
+// available count (NaN availability → trust the plan and let the game validate).
+// Sources not on the page land in `missing`.
+function ssComputeFill(orders, rows){
+    const byCoord = {}
+    rows.forEach(r=>{ byCoord[r.coord] = r })
+    const fills = [], missing = [], clamped = []
+    ssMergeOrders(orders).forEach(o=>{
+        const row = byCoord[o.source]
+        if(!row){ missing.push(o.source); return }
+        const units = {}
+        let any = false
+        Object.keys(o.units).forEach(u=>{
+            const want = o.units[u]||0
+            const have = row.avail && !Number.isNaN(row.avail[u]) && row.avail[u] != null ? row.avail[u] : want
+            const got = Math.min(want, have)
+            if(got < want) clamped.push({coord:o.source, unit:u, want, got})
+            units[u] = got
+            if(got > 0) any = true
+        })
+        if(any) fills.push({coord:o.source, units})
+    })
+    return {fills, missing, clamped}
+}
+
+// Slowest unit's ms-per-field among the units actually in the order (same base
+// seconds the game uses; ws/us from getSpeedConstant(); a sigil % speeds it up the
+// way Calculate does). null if the order is empty.
+function ssSlowestMsPerField(units, ws, us, sigil){
+    const base = {spy:540, light:600, marcher:600, knight:600, heavy:660, spear:1080, axe:1080, archer:1080, sword:1320, ram:1800, catapult:1800, snob:2100}
+    let slowest = null
+    Object.keys(units||{}).forEach(u=>{
+        if((units[u]||0) > 0 && base[u] != null){
+            const ms = base[u]*1000/(ws*us)/(1 + (sigil||0)/100)
+            if(slowest === null || ms > slowest) slowest = ms
+        }
+    })
+    return slowest
+}
+
+// Earliest "send by" over a target's orders: min(arriveMs − travel), one packet per
+// source (ssMergeOrders). null without deadlines.
+function ssTargetSendByMs(orders, ws, us, sigil){
+    let sendBy = null
+    for(const o of ssMergeOrders(orders)){
+        if(o.arriveMs == null) continue
+        const per = ssSlowestMsPerField(o.units, ws, us, sigil)
+        if(per === null) continue
+        const depart = o.arriveMs - per*calcDistance(o.source, o.target)
+        if(sendBy === null || depart < sendBy) sendBy = depart
+    }
+    return sendBy
+}
+
+// Sources whose packet (ssMergeOrders) can no longer make its deadline when it
+// leaves at nowMs.
+function ssLateSources(orders, nowMs, ws, us, sigil){
+    return ssMergeOrders(orders).filter(o=>{
+        if(o.arriveMs == null) return false
+        const per = ssSlowestMsPerField(o.units, ws, us, sigil)
+        return per !== null && nowMs + per*calcDistance(o.source, o.target) > o.arriveMs
+    }).map(o=>o.source)
+}
+
+function ssEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+
+// The server's time zone where it's known: .es plans are server wall time in Europe/Madrid
+// (the zone the tribe-calculator converts them from). null = another market.
+function ssServerZone(){
+    const market = String(game_data.market || String(game_data.world || "").replace(/\d.*$/, ""))
+    return market == "es" ? "Europe/Madrid" : null
+}
+
+// The server's UTC offset (ms) as the game's own clock adds it (window.server_utc_diff, in
+// seconds). Without it: the header clock's time of day against the game's epoch clock, to
+// the nearest 15 min — its date is left out, it goes stale when the tab misses midnight.
+// null = unknown.
+function ssServerOffsetMs(){
+    if(typeof window != "undefined" && typeof window.server_utc_diff == "number" && isFinite(window.server_utc_diff))
+        return window.server_utc_diff*1000
+    try{
+        const t = document.getElementById("serverTime").innerText.trim().split(":")
+        const day = 86400000, q = 15*60*1000
+        let off = ((((+t[0]*60 + +t[1])*60 + +t[2])*1000 - ssEpochNowMs()) % day + day) % day // 0…24 h
+        if(off > 14*3600000) off -= day // → -10 h … +14 h
+        off = Math.round(off/q)*q
+        return Number.isNaN(off) ? null : off
+    }catch(e){ return null }
+}
+
+// A plan time in SERVER time, as the calculator's messages and the game show it: in the
+// server's own time zone where it's known (right across daylight-saving changes, in any
+// browser). Elsewhere: the browser's clock when it runs on the server's offset, else the
+// time shifted by the server's offset.
+function ssFmtDT(ms){
+    const p = n => (n<10?'0':'')+n
+    const zone = ssServerZone()
+    if(zone) try{
+        const o = {}
+        new Intl.DateTimeFormat("en-GB", {timeZone:zone, day:"2-digit", month:"2-digit", hour:"2-digit",
+            minute:"2-digit", second:"2-digit", hourCycle:"h23"}).formatToParts(new Date(ms)).forEach(x=>{ o[x.type] = x.value })
+        return `${o.day}/${o.month} ${o.hour}:${o.minute}:${o.second}`
+    }catch(e){ /* no time-zone data: by the offset below */ }
+    const off = ssServerOffsetMs()
+    if(off === null || off === -new Date().getTimezoneOffset()*60000){
+        const d = new Date(ms)
+        return `${p(d.getDate())}/${p(d.getMonth()+1)} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+    }
+    const d = new Date(ms + off)
+    return `${p(d.getUTCDate())}/${p(d.getUTCMonth()+1)} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`
+}
+
+// ── DOM side ──
+
+var ssPlan = null // {raw, parsed, done:{coord:true}, misses:{coord:true}}
+var ssLastFill = null // the last Fill current target result: its banner survives re-renders
+
+function ssPlanKey(){ return game_data.world + "support_sender_plan_v1" }
+
+function ssServerNowMs(){
+    let serverTime = document.getElementById("serverTime").innerText
+    let serverDate = document.getElementById("serverDate").innerText.split("/")
+    return new Date(serverDate[1]+"/"+serverDate[0]+"/"+serverDate[2]+" "+serverTime).getTime()
+}
+
+// sigil % typed in the form (empty/garbage = 0): travel time ÷ (1 + sigil/100)
+function ssSigilPct(){
+    let sigil = parseInt(document.getElementById("flag_boost").value)
+    return Number.isNaN(sigil) ? 0 : sigil
+}
+
+// "now" as a real epoch, for the plan's deadlines (the calculator exports epochs): the
+// game's own clock. ssServerNowMs reads the server's wall clock in the browser's time
+// zone — right for the land window, whose inputs are read the same way, but hours off
+// against an epoch in a browser outside the server's time zone.
+function ssEpochNowMs(){
+    return (typeof Timing != "undefined" && typeof Timing.getCurrentServerTime == "function")
+        ? Timing.getCurrentServerTime() : ssServerNowMs()
+}
+
+// phone layout: the app (device "android"/"ios") or the mobile-web site, which says
+// device "desktop" too but has its own header
+function ssIsMobile(){
+    return game_data.device != "desktop" || !!document.getElementById("mobileHeader")
+}
+
+function ssCurrentTargetCoord(){
+    try{
+        // on a phone the target sits in the x/y inputs instead of a .village-name
+        if(!ssIsMobile()){
+            // the first .village-name holding a coordinate; ssCoordOf reads past one in the name
+            for(const el of Array.from($(".village-name"))){
+                const c = ssCoordOf($(el).text())
+                if(c) return c
+            }
+            return null
+        }
+        const x = $("#inputx").val(), y = $("#inputy").val()
+        return (x && y) ? x+"|"+y : null
+    }catch(e){ return null }
+}
+
+function ssSavePlan(){
+    if(ssPlan) localStorage.setItem(ssPlanKey(), JSON.stringify({raw:ssPlan.raw, done:ssPlan.done, misses:ssPlan.misses}))
+    else localStorage.removeItem(ssPlanKey())
+}
+
+function ssRestorePlan(){
+    const stored = localStorage.getItem(ssPlanKey())
+    if(!stored) return
+    try{
+        const obj = JSON.parse(stored)
+        const parsed = ssParsePlan(obj.raw)
+        // misses: a v1.1 copy saves the plan without them (one more lookup, then remembered)
+        if(parsed.ok) ssPlan = {raw:obj.raw, parsed, done:obj.done||{},
+                                misses:(obj.misses && typeof obj.misses == "object") ? obj.misses : {}}
+    }catch(e){ /* corrupt store — start empty */ }
+}
+
+function ssLoadPlanClick(){
+    const text = document.getElementById("ss_plan_text").value
+    const parsed = ssParsePlan(text)
+    if(!parsed.ok){
+        const why = {empty:"paste your SUPPORTPLAN export first", header:"not a SUPPORTPLAN export (bad header)",
+                     version:"unsupported SUPPORTPLAN version", units:"bad unit column list", noorders:"no valid order lines"}[parsed.error]
+        UI.ErrorMessage("plan not loaded: " + why, 3000)
+        return
+    }
+    ssPlan = {raw:text, parsed, done:{}, misses:{}}
+    ssLastFill = null
+    ssSavePlan()
+    document.getElementById("ss_plan_text").value = ""
+    ssRenderPlanStatus()
+    ssResolveTargetIds(true) // fresh plan → re-resolve every target's village ID
+    UI.SuccessMessage(`plan loaded: ${parsed.orders.length} orders`, 2000)
+}
+
+function ssClearPlanClick(){
+    if(ssPlan && !confirm("clear the stored support plan?")) return
+    ssPlan = null
+    ssLastFill = null
+    ssSavePlan()
+    ssRenderPlanStatus()
+}
+
+function ssToggleDone(coord){
+    if(!ssPlan) return
+    // ticked on top of the STORED copy: another tab may have ticked, loaded or cleared
+    // the plan meanwhile — a different (or no) stored plan means this tab is out of date
+    let stored = null
+    try{ stored = JSON.parse(localStorage.getItem(ssPlanKey())) }catch(e){ /* unreadable */ }
+    if(!stored || stored.raw !== ssPlan.raw){
+        UI.ErrorMessage("the plan was changed in another tab — run the script again", 3000)
+        return
+    }
+    const want = !ssPlan.done[coord] // what THIS tab shows decides the click
+    ssPlan.done = (stored.done && typeof stored.done == "object") ? stored.done : {}
+    if(stored.misses && typeof stored.misses == "object") ssPlan.misses = stored.misses
+    ssPlan.done[coord] = want
+    ssSavePlan()
+    ssRenderPlanStatus(ssLastFill)
+}
+
+// ── coord → village ID (the mass-call URL needs &target=<villageId>) ──
+// Resolved from the game's OWN /map/village.txt (same origin), one fetch per plan,
+// cached per world. Lines are "id,name(urlencoded),x,y,player,points,rank" — the
+// urlencoded name can never contain a raw comma, so a plain split is safe.
+
+function ssParseVillageTxt(text, wantedCoords){
+    const wanted = new Set(wantedCoords)
+    const map = {}
+    let found = 0
+    for(const line of String(text||'').split('\n')){
+        if(found >= wanted.size) break
+        const p = line.split(',')
+        if(p.length < 4) continue
+        const coord = p[2] + "|" + p[3]
+        if(wanted.has(coord) && map[coord] == null){
+            const id = parseInt(p[0], 10)
+            if(!Number.isNaN(id)){ map[coord] = id; found++ }
+        }
+    }
+    return map
+}
+
+var ssVillageIds = null // {coord: id}, lazy per-world cache
+
+function ssVillageIdsKey(){ return game_data.world + "support_sender_village_ids_v1" }
+
+function ssLoadVillageIds(){
+    if(ssVillageIds) return
+    try{ ssVillageIds = JSON.parse(localStorage.getItem(ssVillageIdsKey())) }
+    catch(e){ ssVillageIds = null }
+    if(!ssVillageIds || typeof ssVillageIds !== 'object') ssVillageIds = {}
+}
+
+// Fetch IDs for plan targets we don't know yet; re-renders the status when they land.
+// force=true re-resolves ALL plan targets (fresh plan load — a rebuilt village on the
+// same coord gets a new ID, so don't trust old cache entries for a new plan).
+// A coord the file doesn't list (no village there) is remembered with the plan, so
+// later runs don't download the ~700 KB file again for it; Load plan retries it.
+function ssResolveTargetIds(force){
+    if(!ssPlan) return
+    ssLoadVillageIds()
+    const plan = ssPlan
+    const coords = ssPlanTargets(plan.parsed.orders).map(t=>t.coord)
+    const missing = force ? coords : coords.filter(c=>ssVillageIds[c] == null && !plan.misses[c])
+    if(!missing.length) return
+    $.get("/map/village.txt", text=>{
+        const map = ssParseVillageTxt(text, missing)
+        if(Object.keys(map).length){
+            Object.keys(map).forEach(c=>{ ssVillageIds[c] = map[c] })
+            localStorage.setItem(ssVillageIdsKey(), JSON.stringify(ssVillageIds))
+            ssRenderPlanStatus(ssLastFill)
+        }
+        // misses only from a real village list (an error page lists none), only into the
+        // plan they were looked up for, and into the STORED copy only while it still is
+        // that plan — another tab may have loaded, cleared or ticked it meanwhile
+        if(ssPlan === plan && /^\d+,[^,\n]*,\d+,\d+,/m.test(String(text||''))){
+            missing.forEach(c=>{ if(map[c] == null) plan.misses[c] = true; else delete plan.misses[c] })
+            let stored = null
+            try{ stored = JSON.parse(localStorage.getItem(ssPlanKey())) }catch(e){ /* unreadable — leave it */ }
+            if(stored && stored.raw === plan.raw)
+                localStorage.setItem(ssPlanKey(), JSON.stringify({raw:stored.raw, done:stored.done||{}, misses:plan.misses}))
+        }
+    })
+}
+
+// The game's link base, keeping the sitter's t=: in sitter mode every game URL carries
+// it, so a link built here takes it from this page's URL when the base doesn't have it
+// (also used by the wrong-screen redirect at the top)
+function ssLinkBase(){
+    const base = game_data.link_base_pure
+    const sitting = Number(game_data.player && game_data.player.sitter) > 0
+    const t = window.location.href.match(/[?&]t=(\d+)/)
+    return (sitting && t && !/[?&]t=\d/.test(base)) ? base.replace("?", "?t=" + t[1] + "&") : base
+}
+
+function ssMassCallUrl(coord){
+    ssLoadVillageIds()
+    const id = ssVillageIds[coord]
+    return ssLinkBase() + "place&mode=call" + (id != null ? "&target=" + id : "")
+}
+
+// fillResult (optional): summary of the last ssFillCurrentTarget run for the banner line
+function ssRenderPlanStatus(fillResult){
+    const host = document.getElementById("ss_plan_status")
+    if(!host) return
+    if(!ssPlan){ host.innerHTML = `<i>no plan loaded — paste your SUPPORTPLAN export above</i>`; return }
+
+    const p = ssPlan.parsed
+    const current = ssCurrentTargetCoord()
+    const targets = ssPlanTargets(p.orders)
+    const doneCount = targets.filter(t=>ssPlan.done[t.coord]).length
+    let sc = null, nowMs = null, sigil = 0
+    try{ sc = getSpeedConstant(); nowMs = ssEpochNowMs() }catch(e){ /* speed/time unavailable — omit send-by */ }
+    try{ sigil = ssSigilPct() }catch(e){ /* no form — no sigil */ }
+
+    let html = `<div style="margin-bottom:6px;"><b>${ssEsc(p.player)}</b> @ ${ssEsc(p.world)} — ${p.orders.length} orders / ${targets.length} targets (${doneCount} done)</div>`
+    if(p.world && game_data.world && p.world !== game_data.world)
+        html += `<div style="color:#ff6b6b;margin-bottom:6px;">⚠ plan is for world <b>${ssEsc(p.world)}</b> but you are on <b>${ssEsc(game_data.world)}</b></div>`
+    if(p.badLines && p.badLines.length)
+        html += `<div style="color:#ffb347;margin-bottom:6px;">⚠ skipped unreadable lines: ${p.badLines.join(", ")}</div>`
+
+    if(fillResult){
+        html += `<div style="color:#7CFC00;margin-bottom:6px;">filled ${fillResult.applied}/${fillResult.orders} orders for ${ssEsc(fillResult.target)}`
+        if(fillResult.missing.length) html += ` — <span style="color:#ffb347;">not in list: ${fillResult.missing.map(ssEsc).join(", ")}</span>`
+        if(fillResult.clamped.length) html += ` — <span style="color:#ffb347;">short: ${fillResult.clamped.map(c=>`${ssEsc(c.coord)} ${ssEsc(c.unit)} ${c.got}/${c.want}`).join(", ")}</span>`
+        if(fillResult.late.length) html += ` — <span style="color:#ff6b6b;">⚠ TOO LATE for: ${fillResult.late.map(ssEsc).join(", ")}</span>`
+        // named whenever it moved a deadline check: a sigil left in the form from
+        // another target could otherwise hide a TOO LATE without a trace
+        if(fillResult.sigil) html += ` — <span style="color:#ffb347;">deadlines checked with a ${fillResult.sigil}% sigil</span>`
+        html += `</div>`
+    }
+
+    html += targets.map(t=>{
+        const isCur = t.coord === current
+        const done = !!ssPlan.done[t.coord]
+        const tOrders = p.orders.filter(o=>o.target === t.coord)
+        // a sigil speeds up support to the village it's on, so only the current
+        // target's send-by counts it; the others stay sigil-free (they err early)
+        const tSigil = isCur ? sigil : 0
+        const sendBy = sc && nowMs !== null ? ssTargetSendByMs(tOrders, sc.worldSpeed, sc.unitSpeed, tSigil) : null
+        let line = `<a href="#" onclick="ssToggleDone('${t.coord}');return false;" title="toggle done" style="text-decoration:none;">${done ? "✅" : "⬜"}</a> `
+        line += `<a href="${ssMassCallUrl(t.coord)}" style="${done ? "opacity:0.5;" : ""}">${t.coord}</a> — ${t.orders} order${t.orders===1?"":"s"}`
+        if(t.arriveMs != null) line += ` — arrive ${ssFmtDT(t.arriveMs)}`
+        if(sendBy != null) line += ` — <span style="color:${nowMs > sendBy ? "#ff6b6b" : "#ffb347"};">send by ${ssFmtDT(sendBy)}${tSigil ? ` (sigil ${tSigil}%)` : ""}</span>`
+        if(isCur) line += ` <b style="color:#7CFC00;">◀ current</b>`
+        return `<div style="margin:2px 0;${done ? "opacity:0.7;" : ""}">${line}</div>`
+    }).join("")
+
+    host.innerHTML = html
+}
+
+function ssFillCurrentTarget(){
+    if(!ssPlan){ UI.ErrorMessage("no plan loaded", 2000); return }
+    const target = ssCurrentTargetCoord()
+    if(!target){ UI.ErrorMessage("could not detect the current target village", 3000); return }
+    const orders = ssPlan.parsed.orders.filter(o=>o.target === target)
+    if(!orders.length){ UI.ErrorMessage(`no planned support for ${target}`, 3000); return }
+
+    // availability snapshot BEFORE touching checkboxes (unit cells per own-village row)
+    const rows = Array.from($("#village_troup_list tbody tr")).map(row=>{
+        const coord = ssCoordOf(row.children[0].innerText)
+        if(!coord) return null
+        const avail = {}
+        ssPlan.parsed.unitCols.forEach(u=>{
+            avail[u] = parseInt($(row).find(`[data-unit='${u}']`).text())
+        })
+        return {coord, avail}
+    }).filter(Boolean)
+
+    const res = ssComputeFill(orders, rows)
+
+    // select every village row, zero the inputs (same mechanics as fillInputs above, the
+    // unit-filter header left alone), then type the planned counts per source row
+    if(!ssSelectAllVillages()){
+        UI.ErrorMessage("no village could be selected — tick the villages, then press Fill current target again", 3000)
+        return
+    }
+    // hidden unit boxes too: the unticked ram column can still hold a Fill-inputs pace-setter
+    $("#village_troup_list").find('input[type=number]:visible, tbody input[class*="call-unit-box-"]').val(0)
+
+    const fillByCoord = {}
+    res.fills.forEach(f=>{ fillByCoord[f.coord] = f.units })
+    const written = new Set()
+    Array.from($(".overview_table .selected")).forEach(row=>{
+        const coord = ssCoordOf(row.children[0].innerText)
+        if(coord && fillByCoord[coord]){
+            Object.keys(fillByCoord[coord]).forEach(u=>{
+                $(row).find(`.call-unit-box-${u}`).val(fillByCoord[coord][u])
+            })
+            written.add(coord)
+        }
+    })
+    // each order as actually typed: only its units that got a count > 0 in its row (two
+    // orders from one source share the row); null = nothing of it typed. A source that
+    // isn't on the page keeps the plan's units, so its TOO LATE still says something.
+    const onPage = new Set(rows.map(r=>r.coord))
+    const asTyped = o=>{
+        if(!onPage.has(o.source)) return o
+        const t = written.has(o.source) ? fillByCoord[o.source] : {}
+        const units = {}
+        Object.keys(o.units).forEach(u=>{ units[u] = (o.units[u] > 0 && t[u] > 0) ? o.units[u] : 0 })
+        return Object.keys(units).some(u=>units[u] > 0) ? Object.assign({}, o, {units}) : null
+    }
+    // filled = at least one of the order's own units typed
+    const applied = orders.filter(o=>onPage.has(o.source) && asTyped(o) != null).length
+
+    // deadline check on what was typed (a unit short to 0 doesn't slow the packet; an
+    // order with nothing typed brings no deadline), with the form's sigil as in Calculate
+    let late = [], sigil = 0
+    try{
+        const sc = getSpeedConstant(), nowMs = ssEpochNowMs()
+        sigil = ssSigilPct()
+        late = ssLateSources(orders.map(asTyped).filter(Boolean), nowMs, sc.worldSpeed, sc.unitSpeed, sigil)
+    }catch(e){ /* no speed/server time — skip the check */ }
+    if(!orders.some(o=>o.arriveMs != null)) sigil = 0 // no deadline it could move
+
+    ssLastFill = {target, orders:orders.length, applied, missing:res.missing, clamped:res.clamped, late, sigil}
+    ssRenderPlanStatus(ssLastFill)
+    if(applied > 0) UI.SuccessMessage(`filled ${applied}/${orders.length} orders — review and press the game's send button`, 3000)
+    else UI.ErrorMessage(orders.some(o=>onPage.has(o.source))
+        ? "nothing filled — the planned villages don't have those troops (see short:)"
+        : "nothing filled — none of the planned source villages are in the list", 3000)
+}
+
+// A village's coordinate in a label like "023|071| Narnia OG (493|446) K44": the
+// LAST "(x|y)", since a name can carry coordinates of its own. A label without
+// brackets falls back to its first x|y (the old reading). null = none at all.
+function ssCoordOf(text){
+    const s = String(text == null ? "" : text)
+    const inBrackets = s.match(/\(\d{1,3}\|\d{1,3}\)/g)
+    if(inBrackets) return inBrackets[inBrackets.length-1].slice(1, -1)
+    const bare = s.match(/\d+\|\d+/)
+    return bare ? bare[0] : null
+}
+
+function calcDistance(coord1,coord2){
+    let x1=parseInt(coord1.split("|")[0])
+    let y1=parseInt(coord1.split("|")[1])
+    let x2=parseInt(coord2.split("|")[0])
+    let y2=parseInt(coord2.split("|")[1])
+
+    return Math.sqrt( (x1-x2)*(x1-x2) +  (y1-y2)*(y1-y2) );
+}
+
+function getSpeedConstant() { // world speed × unit speed, fetched once and cached per world
+    const key = game_data.world+"speedWorld"
+    const cached = localStorage.getItem(key)
+    if (cached !== null) return JSON.parse(cached)
+
+    const data = httpGet("/interface.php?func=get_config")
+    const htmlDoc = new DOMParser().parseFromString(data, 'text/html')
+    const obj = {
+        worldSpeed: Number(htmlDoc.getElementsByTagName("speed")[0].innerHTML),
+        unitSpeed: Number(htmlDoc.getElementsByTagName("unit_speed")[0].innerHTML)
+    }
+    localStorage.setItem(key, JSON.stringify(obj))
+    return obj
+}
+
+// Entry point — MUST stay the last statement in the file (see the note where the
+// original mid-file call sat: earlier invocation lets later `var` initializers
+// clobber the state main() just restored).
+if(ssRightScreen) main()
