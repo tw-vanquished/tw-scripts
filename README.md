@@ -94,7 +94,7 @@ javascript:$.getScript("https://cdn.jsdelivr.net/gh/tw-vanquished/tw-scripts@mai
 
 ### supportSender v1.2
 
-*Not yet submitted for review (v1.1 above is the version under review).*
+*Submitted for review as an update to v1.1 above, which is still under review; v1.2 includes everything in v1.1.*
 
 v1.1 plus an **exact split**: the shares always add up to the amounts typed (7 spies over 10 villages = 1 spy from the 7 villages holding the most), and *Fill inputs* / *Fill current target* can be pressed again without deselecting the villages. Fixes: village names that contain coordinates no longer confuse the rows or the target; the sigil counts in the plan's *send by* time and *TOO LATE* check for the current target; two plan orders from the same village are typed together; plan times are shown in server time; a missing target is reported; a broken saved theme colour no longer stops the script; the village list is not downloaded again for coordinates without a village; the mobile site and sitter links are handled. The *pop* column is now labelled *def pop* (heavy cavalry counts 4, spies 0).
 
